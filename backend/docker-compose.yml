@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-reelang}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reelang}
+      POSTGRES_DB: ${POSTGRES_DB:-reelang}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-reelang}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-reelang}:${POSTGRES_PASSWORD:-reelang}@postgres:5432/${POSTGRES_DB:-reelang}
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - video_cache:/tmp/reels
+    command: >
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  postgres_data:
+  video_cache:

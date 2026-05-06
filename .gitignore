@@ -1,0 +1,35 @@
+# ===== SEKRETY =====
+**/.env
+**/serviceAccountKey.json
+**/google-services.json
+**/cookies.txt
+**/*.keystore
+**/*.jks
+**/local.properties
+**/.env.local
+**/.env.production
+
+# ===== ANDROID =====
+android/.gradle/
+android/build/
+android/app/build/
+android/.idea/
+android/**/*.iml
+android/captures/
+android/.cxx/
+
+# ===== BACKEND =====
+backend/__pycache__/
+backend/**/*.pyc
+backend/.venv/
+backend/venv/
+backend/tmp/
+backend/video_cache/
+
+# ===== DOCKER =====
+**/postgres_data/
+
+# ===== SYSTEM =====
+.DS_Store
+Thumbs.db
+*.log
