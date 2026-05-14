@@ -62,20 +62,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 data class ReelItem(
     val id: String,
-    val channelName: String,
+    val channelName: String = "",
     val avatarEmoji: String,
     val originalText: String,
     val translatedText: String,
     val clickableWord: String,
     val likes: Int,
     val saves: Int,
-    val level: String,
+    val level: String = "",
     val streakDays: Int,
     val language: String,
     val bgColors: List<Color>,
@@ -147,15 +148,23 @@ class FeedViewModel : ViewModel() {
         }
     }
 
-    /** Fetches captions for [reelId] once and caches the result. No-op on repeat calls. */
     fun loadCaptions(reelId: String) {
-        if (_captionsMap.value.containsKey(reelId)) return
+        val cached = _captionsMap.value[reelId]
+        if (cached != null && cached.isNotEmpty()) return
+        loadCaptionsWithRetry(reelId, retryCount = 0)
+    }
+
+    private fun loadCaptionsWithRetry(reelId: String, retryCount: Int) {
         viewModelScope.launch {
             runCatching { ApiClient.api.getCaptions(reelId) }
                 .onSuccess { segments ->
-                    _captionsMap.update { current -> current + (reelId to segments) }
+                    if (segments.isNotEmpty()) {
+                        _captionsMap.update { current -> current + (reelId to segments) }
+                    } else if (retryCount < 5) {
+                        delay(3000)
+                        loadCaptionsWithRetry(reelId, retryCount + 1)
+                    }
                 }
-            // captions are best-effort — silently swallow errors
         }
     }
 
@@ -181,14 +190,14 @@ class FeedViewModel : ViewModel() {
 
     private fun ReelResponse.toReelItem() = ReelItem(
         id = id,
-        channelName = channelName,
+        channelName = channelName ?: "",
         avatarEmoji = avatarEmoji,
         originalText = originalText,
         translatedText = translatedText,
         clickableWord = clickableWord,
         likes = likes,
         saves = saves,
-        level = level,
+        level = level ?: "",
         streakDays = streakDays,
         language = language,
         bgColors = bgColorsFor(language),

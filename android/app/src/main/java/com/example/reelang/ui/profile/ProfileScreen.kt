@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import com.example.reelang.ui.onboarding.ReelangBorder
 import com.example.reelang.ui.onboarding.ReelangCream
 import com.example.reelang.ui.onboarding.ReelangRed
@@ -145,6 +146,7 @@ private val profileTabs = listOf("Posts", "Saved")
 
 @Composable
 fun ProfileScreen(
+    navController: NavController,
     modifier: Modifier = Modifier,
     onNavigateToStats: () -> Unit = {},
     viewModel: ProfileViewModel = viewModel()
@@ -158,7 +160,7 @@ fun ProfileScreen(
         containerColor = ReelangCream,
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { /* TODO: create */ },
+                onClick = { navController.navigate("create_reel") },
                 containerColor = ReelangRed,
                 contentColor = Color.White,
                 shape = RoundedCornerShape(16.dp)

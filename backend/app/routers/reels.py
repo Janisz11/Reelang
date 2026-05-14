@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
+import re
+import uuid
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -15,16 +18,76 @@ from ..schemas import (
     ReelImportRequest,
     ReelImportResponse,
     ReelResponse,
+    ReelUploadResponse,
 )
 from ..services import yt_dlp_service, translation_service
+from ..services.whisper_service import transcribe_audio, transcribe_file
+
+UPLOAD_DIR = Path("/tmp/reels")
+CHUNK_SIZE = 1024 * 1024  # 1 MB
 
 router = APIRouter(prefix="/reels", tags=["reels"])
+logger = logging.getLogger(__name__)
+
+
+async def transcribe_and_save_captions(
+    reel_id: str,
+    youtube_id: str,
+    language: str,
+    db: Session,
+) -> None:
+    try:
+        segments = await transcribe_audio(youtube_id, language)
+        for seg in segments:
+            caption = CaptionSegment(
+                id=str(uuid.uuid4()),
+                reel_id=reel_id,
+                start_ms=seg["start_ms"],
+                end_ms=seg["end_ms"],
+                original_text=seg["original_text"],
+                translated_text=seg.get("translated_text"),
+            )
+            db.add(caption)
+        db.commit()
+        logger.info(f"Transcribed {len(segments)} segments for reel {reel_id}")
+    except Exception as e:
+        logger.error(f"Transcription failed for reel {reel_id}: {e}")
+        db.rollback()
+
+
+async def _transcribe_uploaded_reel(
+    reel_id: str,
+    file_path: str,
+    language: str,
+    db: Session,
+) -> None:
+    try:
+        segments = await transcribe_file(file_path, language)
+        for seg in segments:
+            caption = CaptionSegment(
+                id=str(uuid.uuid4()),
+                reel_id=reel_id,
+                start_ms=seg["start_ms"],
+                end_ms=seg["end_ms"],
+                original_text=seg["original_text"],
+                translated_text=seg.get("translated_text"),
+            )
+            db.add(caption)
+        db.commit()
+        logger.info(f"Transcribed {len(segments)} segments for uploaded reel {reel_id}")
+    except Exception as e:
+        logger.error(f"Transcription failed for uploaded reel {reel_id}: {e}")
+        db.rollback()
 
 
 # ── POST /reels/import ────────────────────────────────────────────────────────
 
 @router.post("/import", response_model=ReelImportResponse, status_code=201)
-def import_reel(payload: ReelImportRequest, db: Session = Depends(get_db)):
+async def import_reel(
+    payload: ReelImportRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     # 1. Fetch metadata only (no video download)
     try:
         info = yt_dlp_service.fetch_video_info(payload.youtube_url)
@@ -49,7 +112,62 @@ def import_reel(payload: ReelImportRequest, db: Session = Depends(get_db)):
     db.add(reel)
     db.commit()
     db.refresh(reel)
+
+    # 4. Transcribe in background
+    background_tasks.add_task(
+        transcribe_and_save_captions,
+        reel.id,
+        reel.youtube_id,
+        reel.language,
+        db,
+    )
+
     return ReelImportResponse(reel_id=reel.id, stream_url=None, captions_count=0)
+
+
+# ── POST /reels/upload ────────────────────────────────────────────────────────
+
+@router.post("/upload", response_model=ReelUploadResponse, status_code=201)
+async def upload_reel(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(..., media_type="video/mp4"),
+    title: str = Form(...),
+    language: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    if file.content_type and not file.content_type.startswith("video/"):
+       raise HTTPException(status_code=422, detail="Only video files are accepted")
+
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    reel_id = str(uuid.uuid4())
+    dest = UPLOAD_DIR / f"{reel_id}.mp4"
+
+    try:
+        with dest.open("wb") as out:
+            while chunk := await file.read(CHUNK_SIZE):
+                out.write(chunk)
+    except Exception as exc:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail=f"File save failed: {exc}")
+
+    reel = Reel(
+        id=reel_id,
+        title=title,
+        language=language,
+        file_path=str(dest),
+    )
+    db.add(reel)
+    db.commit()
+    db.refresh(reel)
+
+    background_tasks.add_task(_transcribe_uploaded_reel, reel.id, str(dest), language, db)
+
+    return ReelUploadResponse(
+        id=reel.id,
+        title=reel.title,
+        language=reel.language,
+        stream_url=f"/api/v1/reels/{reel.id}/stream",
+    )
 
 
 # ── GET /reels ─────────────────────────────────────────────────────────────────
@@ -83,29 +201,109 @@ def get_reel(reel_id: str, db: Session = Depends(get_db)):
     return reel
 
 
-# ── GET /reels/{reel_id}/stream ───────────────────────────────────────────────
+# ── POST /reels/{reel_id}/transcribe ─────────────────────────────────────────
 
-@router.get("/{reel_id}/stream")
-def stream_reel(reel_id: str, db: Session = Depends(get_db)):
+@router.post("/{reel_id}/transcribe")
+async def transcribe_reel(reel_id: str, db: Session = Depends(get_db)):
     reel = db.query(Reel).filter(Reel.id == reel_id).first()
     if not reel:
         raise HTTPException(status_code=404, detail="Reel not found")
 
-    video_path = Path(f"/tmp/reels/{reel.youtube_id}.mp4")
+    try:
+        segments = await transcribe_audio(reel.youtube_id, reel.language)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Transcription failed: {exc}")
 
-    if not video_path.exists():
-        try:
-            video_path = yt_dlp_service.ensure_video_downloaded(
+    for seg in segments:
+        db.add(
+            CaptionSegment(
+                id=str(uuid.uuid4()),
+                reel_id=reel_id,
+                start_ms=seg["start_ms"],
+                end_ms=seg["end_ms"],
+                original_text=seg["original_text"],
+            )
+        )
+    db.commit()
+
+    return {"captions_count": len(segments)}
+
+
+# ── GET /reels/{reel_id}/stream ───────────────────────────────────────────────
+
+def _resolve_video_path(reel: Reel) -> Path:
+    if reel.file_path:
+        return Path(reel.file_path)
+    if reel.youtube_id:
+        p = Path(f"/tmp/reels/{reel.youtube_id}.mp4")
+        if not p.exists():
+            p = yt_dlp_service.ensure_video_downloaded(
                 reel.youtube_id,
                 f"https://www.youtube.com/watch?v={reel.youtube_id}",
             )
-        except Exception as exc:
-            raise HTTPException(status_code=502, detail=f"Video download failed: {exc}")
+        return p
+    raise HTTPException(status_code=404, detail="No video source for this reel")
+
+
+@router.get("/{reel_id}/stream")
+def stream_reel(reel_id: str, request: Request, db: Session = Depends(get_db)):
+    reel = db.query(Reel).filter(Reel.id == reel_id).first()
+    if not reel:
+        raise HTTPException(status_code=404, detail="Reel not found")
+
+    try:
+        video_path = _resolve_video_path(reel)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Video unavailable: {exc}")
+
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Video file not found on disk")
+
+    file_size = video_path.stat().st_size
+    range_header = request.headers.get("Range")
+
+    if range_header:
+        match = re.match(r"bytes=(\d+)-(\d*)", range_header)
+        if match:
+            start = int(match.group(1))
+            end = int(match.group(2)) if match.group(2) else file_size - 1
+            end = min(end, file_size - 1)
+            if start > end or start >= file_size:
+                raise HTTPException(
+                    status_code=416,
+                    detail="Range Not Satisfiable",
+                    headers={"Content-Range": f"bytes */{file_size}"},
+                )
+            length = end - start + 1
+
+            def iter_range():
+                with video_path.open("rb") as f:
+                    f.seek(start)
+                    remaining = length
+                    while remaining > 0:
+                        data = f.read(min(CHUNK_SIZE, remaining))
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+
+            return StreamingResponse(
+                iter_range(),
+                status_code=206,
+                media_type="video/mp4",
+                headers={
+                    "Content-Range": f"bytes {start}-{end}/{file_size}",
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(length),
+                },
+            )
 
     return FileResponse(
         path=str(video_path),
         media_type="video/mp4",
-        headers={"Accept-Ranges": "bytes"},
+        headers={"Accept-Ranges": "bytes", "Content-Length": str(file_size)},
     )
 
 

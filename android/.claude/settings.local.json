@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ipconfig)",
+      "Bash(findstr /i \"IPv4\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\kjani\\\\ReeLang-Repo\\\\backend\" -Recurse -Force)",
+      "Bash(Select-Object -Property FullName)"
+    ]
+  }
+}

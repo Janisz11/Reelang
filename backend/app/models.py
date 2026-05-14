@@ -13,12 +13,13 @@ class Reel(Base):
     __tablename__ = "reels"
 
     id = Column(String, primary_key=True, default=gen_uuid)
-    youtube_id = Column(String, unique=True, nullable=False, index=True)
+    youtube_id = Column(String, unique=True, nullable=True, index=True)
     title = Column(String, nullable=False)
-    channel_name = Column(String, nullable=False)
+    channel_name = Column(String, nullable=True)
     thumbnail_url = Column(String)
-    duration_ms = Column(Integer, nullable=False)
+    duration_ms = Column(Integer, nullable=True)
     language = Column(String, nullable=False, index=True)
+    file_path = Column(String, nullable=True)
     level = Column(String, nullable=True, index=True)
     topic = Column(String, nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

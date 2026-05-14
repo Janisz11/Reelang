@@ -18,6 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+RUN mkdir -p /tmp/audio
+
 EXPOSE 8000
 
 # Ważne: upewnij się, że ścieżka do aplikacji jest poprawna (app.main vs main)

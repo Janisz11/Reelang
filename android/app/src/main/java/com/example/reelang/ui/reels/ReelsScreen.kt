@@ -1,6 +1,7 @@
 package com.example.reelang.ui.reels
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,8 +15,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import com.example.reelang.network.models.CaptionSegment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -26,6 +29,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.reelang.network.ApiClient
 import com.example.reelang.ui.common.UiState
 import com.example.reelang.ui.feed.FeedViewModel
 import com.example.reelang.ui.feed.ReelActions
@@ -79,6 +83,11 @@ fun ReelsScreen(
                 val reels = state.data
                 if (reels.isNotEmpty()) {
                     val pagerState = rememberPagerState { reels.size }
+                    val captionsMap by viewModel.captionsMap.collectAsState()
+
+                    LaunchedEffect(pagerState.settledPage) {
+                        viewModel.loadCaptions(reels[pagerState.settledPage].id)
+                    }
 
                     VerticalPager(
                         state = pagerState,
@@ -87,6 +96,8 @@ fun ReelsScreen(
                         val reel = reels[page]
                         ReelCard(
                             reel = reel,
+                            captions = captionsMap[reel.id] ?: emptyList(),
+                            isActive = pagerState.settledPage == page,
                             onLike = { viewModel.toggleLike(reel.id) },
                             onSave = { viewModel.toggleSave(reel.id) },
                             onShare = {}
@@ -101,6 +112,8 @@ fun ReelsScreen(
 @Composable
 fun ReelCard(
     reel: ReelItem,
+    captions: List<CaptionSegment> = emptyList(),
+    isActive: Boolean = false,
     onLike: () -> Unit,
     onSave: () -> Unit,
     onShare: () -> Unit
@@ -119,9 +132,18 @@ fun ReelCard(
             ) {
                 YouTubeView(
                     youtubeId = youtubeId,
+                    captions = captions,
+                    isActive = isActive,
                     modifier = Modifier.fillMaxSize()
                 )
             }
+        } else {
+            LocalVideoPlayer(
+                streamUrl = "${ApiClient.BASE_URL}reels/${reel.id}/stream",
+                isActive = isActive,
+                captions = captions,
+                modifier = Modifier.fillMaxSize()
+            )
         }
 
         Box(
@@ -146,6 +168,27 @@ fun ReelCard(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 16.dp)
+        )
+    }
+}
+
+@Composable
+fun CaptionsOverlay(
+    captions: List<CaptionSegment>,
+    modifier: Modifier = Modifier
+) {
+    val caption = captions.firstOrNull() ?: return
+    Box(
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = caption.originalText ?: "",
+            color = Color.White,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
         )
     }
 }

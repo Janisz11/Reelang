@@ -40,6 +40,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.reelang.auth.AuthScreen
 import com.example.reelang.auth.AuthViewModel
+import com.example.reelang.ui.create.CreateReelScreen
 import com.example.reelang.ui.onboarding.OnboardingScreen
 import com.example.reelang.ui.reels.ReelsScreen
 import com.example.reelang.ui.profile.ProfileScreen
@@ -156,6 +157,7 @@ fun AppNavigation(
 
             composable("profile") {
                 ProfileScreen(
+                    navController = navController,
                     modifier = Modifier.padding(innerPadding),
                     onNavigateToStats = { navController.navigate("stats") }
                 )
@@ -163,6 +165,10 @@ fun AppNavigation(
 
             composable("stats") {
                 StatsScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable("create_reel") {
+                CreateReelScreen(navController = navController)
             }
         }
     }

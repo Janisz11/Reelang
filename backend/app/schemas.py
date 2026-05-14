@@ -19,13 +19,20 @@ class ReelImportResponse(BaseModel):
     captions_count: int
 
 
+class ReelUploadResponse(BaseModel):
+    id: str
+    title: str
+    language: str
+    stream_url: str
+
+
 class ReelResponse(BaseModel):
     id: str
-    youtube_id: str
+    youtube_id: Optional[str] = None
     title: str
-    channel_name: str
+    channel_name: Optional[str] = None
     thumbnail_url: Optional[str]
-    duration_ms: int
+    duration_ms: Optional[int] = None
     language: str
     level: Optional[str]
     topic: Optional[str]
