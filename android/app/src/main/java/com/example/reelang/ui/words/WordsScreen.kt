@@ -91,6 +91,9 @@ class WordsViewModel : ViewModel() {
 
     init {
         loadWords()
+        viewModelScope.launch {
+            WordsEventBus.wordSaved.collect { loadWords() }
+        }
     }
 
     fun loadWords() {
@@ -108,9 +111,9 @@ class WordsViewModel : ViewModel() {
     private fun WordResponse.toWord() = Word(
         id = id,
         term = term,
-        definition = definition,
-        status = if (status.uppercase() == "MASTERED") WordStatus.MASTERED else WordStatus.LEARNING,
-        progress = progress,
+        definition = definition ?: "",
+        status = if (status?.uppercase() == "MASTERED") WordStatus.MASTERED else WordStatus.LEARNING,
+        progress = progress ?: 0f,
         language = language
     )
 }

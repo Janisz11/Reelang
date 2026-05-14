@@ -56,6 +56,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.reelang.network.ApiClient
 import com.example.reelang.network.models.CaptionSegment
 import com.example.reelang.network.models.ReelResponse
+import com.example.reelang.network.models.SaveWordRequest
+import com.example.reelang.ui.words.WordsEventBus
 import com.example.reelang.ui.common.UiState
 import com.example.reelang.ui.onboarding.ReelangRed
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -176,6 +178,35 @@ class FeedViewModel : ViewModel() {
                 likes = if (reel.isLiked) reel.likes - 1 else reel.likes + 1
             ) else reel
         })
+    }
+
+    private val _savedTerms = mutableSetOf<String>()
+
+    fun saveWord(term: String, language: String, reelId: String) {
+        val key = "${term.lowercase()}_${language}"
+        if (_savedTerms.contains(key)) {
+            Log.d("FeedViewModel", "Word already saved, skipping: $term")
+            return
+        }
+        _savedTerms.add(key)
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.saveWord(
+                    SaveWordRequest(
+                        term = term,
+                        definition = "",
+                        language = language,
+                        reelId = reelId
+                    )
+                )
+            }.onSuccess {
+                Log.d("FeedViewModel", "Saved word: $term")
+                WordsEventBus.notifyWordSaved()
+            }.onFailure {
+                _savedTerms.remove(key)
+                Log.e("FeedViewModel", "Failed to save word: $term", it)
+            }
+        }
     }
 
     fun toggleSave(id: String) {

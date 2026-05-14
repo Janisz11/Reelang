@@ -100,7 +100,8 @@ fun ReelsScreen(
                             isActive = pagerState.settledPage == page,
                             onLike = { viewModel.toggleLike(reel.id) },
                             onSave = { viewModel.toggleSave(reel.id) },
-                            onShare = {}
+                            onShare = {},
+                            onWordClick = { word -> viewModel.saveWord(word, reel.language, reel.id) }
                         )
                     }
                 }
@@ -116,7 +117,8 @@ fun ReelCard(
     isActive: Boolean = false,
     onLike: () -> Unit,
     onSave: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onWordClick: (String) -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -134,6 +136,7 @@ fun ReelCard(
                     youtubeId = youtubeId,
                     captions = captions,
                     isActive = isActive,
+                    onWordClick = onWordClick,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -142,6 +145,7 @@ fun ReelCard(
                 streamUrl = "${ApiClient.BASE_URL}reels/${reel.id}/stream",
                 isActive = isActive,
                 captions = captions,
+                onWordClick = onWordClick,
                 modifier = Modifier.fillMaxSize()
             )
         }

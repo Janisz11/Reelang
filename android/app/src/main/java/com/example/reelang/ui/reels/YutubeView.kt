@@ -2,7 +2,10 @@ package com.example.reelang.ui.reels
 
 import android.annotation.SuppressLint
 import android.util.Log
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -31,6 +34,7 @@ fun YouTubeView(
     youtubeId: String,
     captions: List<CaptionSegment> = emptyList(),
     isActive: Boolean = false,
+    onWordClick: (String) -> Unit = {},
     modifier: Modifier = Modifier.fillMaxSize()
 ) {
     var currentTimeMs by remember { mutableStateOf(0L) }
@@ -120,12 +124,9 @@ fun YouTubeView(
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
+                    ClickableCaptionText(
                         text = activeCaption.originalText ?: "",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
+                        onWordClick = onWordClick,
                         modifier = Modifier.fillMaxWidth()
                     )
                     if (!activeCaption.translatedText.isNullOrEmpty()) {
@@ -150,6 +151,7 @@ fun LocalVideoPlayer(
     streamUrl: String,
     isActive: Boolean,
     captions: List<CaptionSegment> = emptyList(),
+    onWordClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -208,12 +210,9 @@ fun LocalVideoPlayer(
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
+                    ClickableCaptionText(
                         text = activeCaption.originalText ?: "",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
+                        onWordClick = onWordClick,
                         modifier = Modifier.fillMaxWidth()
                     )
                     if (!activeCaption.translatedText.isNullOrEmpty()) {
@@ -228,6 +227,45 @@ fun LocalVideoPlayer(
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun ClickableCaptionText(
+    text: String,
+    onWordClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val words = text.split(" ")
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        words.forEach { word ->
+            val cleanWord = word.trim().trimEnd('.', ',', '!', '?', ';', ':')
+            var clicked by remember { mutableStateOf(false) }
+            val color by animateColorAsState(
+                targetValue = if (clicked) Color(0xFFFFD700) else Color.White,
+                animationSpec = tween(300),
+                finishedListener = { clicked = false },
+                label = "wordColor"
+            )
+            Text(
+                text = "$word ",
+                color = color,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clickable {
+                        if (cleanWord.isNotEmpty()) {
+                            clicked = true
+                            onWordClick(cleanWord)
+                        }
+                    }
+                    .padding(horizontal = 1.dp)
+            )
         }
     }
 }
