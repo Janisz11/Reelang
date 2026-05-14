@@ -32,7 +32,7 @@ def add_word(payload: WordCreateRequest, db: Session = Depends(get_db)):
     if existing:
         return existing
 
-    definition = fetch_definition(payload.term)
+    definition = fetch_definition(payload.term, payload.language)
 
     word = Word(
         user_id=HARDCODED_USER_ID,

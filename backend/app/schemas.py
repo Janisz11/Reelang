@@ -24,6 +24,7 @@ class ReelUploadResponse(BaseModel):
     title: str
     language: str
     stream_url: str
+    tags: Optional[str] = None
 
 
 class ReelResponse(BaseModel):
@@ -36,6 +37,7 @@ class ReelResponse(BaseModel):
     language: str
     level: Optional[str]
     topic: Optional[str]
+    tags: Optional[str] = None
     created_at: datetime
 
     class Config:

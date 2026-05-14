@@ -22,6 +22,7 @@ class Reel(Base):
     file_path = Column(String, nullable=True)
     level = Column(String, nullable=True, index=True)
     topic = Column(String, nullable=True, index=True)
+    tags = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     segments = relationship("CaptionSegment", back_populates="reel", cascade="all, delete-orphan")

@@ -105,7 +105,7 @@ async def import_reel(
     # 3. Persist Reel
     reel = Reel(
         **meta,
-        language=payload.language,
+        language=payload.language.lower(),
         level=payload.level,
         topic=payload.topic,
     )
@@ -133,6 +133,7 @@ async def upload_reel(
     file: UploadFile = File(..., media_type="video/mp4"),
     title: str = Form(...),
     language: str = Form(...),
+    tags: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
     if file.content_type and not file.content_type.startswith("video/"):
@@ -153,8 +154,9 @@ async def upload_reel(
     reel = Reel(
         id=reel_id,
         title=title,
-        language=language,
+        language=language.lower(),
         file_path=str(dest),
+        tags=tags,
     )
     db.add(reel)
     db.commit()
@@ -167,6 +169,7 @@ async def upload_reel(
         title=reel.title,
         language=reel.language,
         stream_url=f"/api/v1/reels/{reel.id}/stream",
+        tags=reel.tags,
     )
 
 
@@ -177,17 +180,22 @@ def list_reels(
     language: Optional[str] = Query(None),
     level: Optional[str] = Query(None),
     topic: Optional[str] = Query(None),
+    tags: Optional[str] = Query(None),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    from sqlalchemy import or_
     q = db.query(Reel)
     if language:
-        q = q.filter(Reel.language == language)
+        q = q.filter(Reel.language == language.lower())
     if level:
         q = q.filter(Reel.level == level)
     if topic:
         q = q.filter(Reel.topic == topic)
+    if tags:
+        tag_list = [t.strip() for t in tags.split(",")]
+        q = q.filter(or_(*[Reel.tags.contains(tag) for tag in tag_list]))
     return q.order_by(Reel.created_at.desc()).offset(offset).limit(limit).all()
 
 
