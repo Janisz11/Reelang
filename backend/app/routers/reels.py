@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import subprocess
 import uuid
 from pathlib import Path
 from typing import List, Optional
@@ -125,6 +126,24 @@ async def import_reel(
     return ReelImportResponse(reel_id=reel.id, stream_url=None, captions_count=0)
 
 
+def generate_thumbnail(video_path: str, reel_id: str) -> Optional[str]:
+    thumb_dir = Path("/tmp/thumbnails")
+    thumb_dir.mkdir(parents=True, exist_ok=True)
+    thumb_path = thumb_dir / f"{reel_id}.jpg"
+    try:
+        subprocess.run(
+            ["ffmpeg", "-i", str(video_path), "-ss", "00:00:01", "-vframes", "1", "-q:v", "2", str(thumb_path), "-y"],
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+        if thumb_path.exists():
+            return str(thumb_path)
+    except Exception as e:
+        logger.warning(f"Thumbnail generation failed: {e}")
+    return None
+
+
 # ── POST /reels/upload ────────────────────────────────────────────────────────
 
 @router.post("/upload", response_model=ReelUploadResponse, status_code=201)
@@ -134,6 +153,7 @@ async def upload_reel(
     title: str = Form(...),
     language: str = Form(...),
     tags: Optional[str] = Form(None),
+    owner_user_id: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
     if file.content_type and not file.content_type.startswith("video/"):
@@ -151,12 +171,16 @@ async def upload_reel(
         dest.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"File save failed: {exc}")
 
+    thumb_path = generate_thumbnail(str(dest), reel_id)
+
     reel = Reel(
         id=reel_id,
         title=title,
         language=language.lower(),
         file_path=str(dest),
         tags=tags,
+        owner_user_id=owner_user_id,
+        thumbnail_url=f"/api/v1/reels/{reel_id}/thumbnail" if thumb_path else None,
     )
     db.add(reel)
     db.commit()
@@ -199,6 +223,18 @@ def list_reels(
     return q.order_by(Reel.created_at.desc()).offset(offset).limit(limit).all()
 
 
+# ── GET /reels/user/{user_id} ─────────────────────────────────────────────────
+
+@router.get("/user/{user_id}", response_model=List[ReelResponse])
+def get_user_reels(user_id: str, db: Session = Depends(get_db)):
+    return (
+        db.query(Reel)
+        .filter(Reel.owner_user_id == user_id)
+        .order_by(Reel.created_at.desc())
+        .all()
+    )
+
+
 # ── GET /reels/{reel_id} ───────────────────────────────────────────────────────
 
 @router.get("/{reel_id}", response_model=ReelDetailResponse)
@@ -235,6 +271,19 @@ async def transcribe_reel(reel_id: str, db: Session = Depends(get_db)):
     db.commit()
 
     return {"captions_count": len(segments)}
+
+
+# ── GET /reels/{reel_id}/thumbnail ───────────────────────────────────────────
+
+@router.get("/{reel_id}/thumbnail")
+def get_thumbnail(reel_id: str, db: Session = Depends(get_db)):
+    reel = db.query(Reel).filter(Reel.id == reel_id).first()
+    if not reel:
+        raise HTTPException(status_code=404, detail="Reel not found")
+    thumb_path = Path(f"/tmp/thumbnails/{reel_id}.jpg")
+    if not thumb_path.exists():
+        raise HTTPException(status_code=404, detail="Thumbnail not found")
+    return FileResponse(str(thumb_path), media_type="image/jpeg")
 
 
 # ── GET /reels/{reel_id}/stream ───────────────────────────────────────────────

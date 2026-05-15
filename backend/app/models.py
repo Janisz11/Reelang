@@ -1,6 +1,6 @@
 import uuid
-from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text, Enum
+from datetime import datetime, date
+from sqlalchemy import Column, String, Integer, BigInteger, DateTime, Date, ForeignKey, Text, Enum
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -23,6 +23,7 @@ class Reel(Base):
     level = Column(String, nullable=True, index=True)
     topic = Column(String, nullable=True, index=True)
     tags = Column(String, nullable=True)
+    owner_user_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     segments = relationship("CaptionSegment", back_populates="reel", cascade="all, delete-orphan")
@@ -60,3 +61,37 @@ class Word(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     reel = relationship("Reel", back_populates="words")
+
+
+class Profile(Base):
+    __tablename__ = "profiles"
+
+    user_id = Column(String, primary_key=True)
+    username = Column(String, nullable=False)
+    bio = Column(String, nullable=True)
+    avatar_initials = Column(String, nullable=True)
+    followers_count = Column(Integer, default=0, nullable=False)
+    following_count = Column(Integer, default=0, nullable=False)
+    total_likes = Column(Integer, default=0, nullable=False)
+    level = Column(Integer, default=1, nullable=False)
+    streak_days = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class Follow(Base):
+    __tablename__ = "follows"
+
+    follower_id = Column(String, nullable=False, primary_key=True)
+    following_id = Column(String, nullable=False, primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    user_id = Column(String, nullable=False, index=True)
+    date = Column(Date, nullable=False)
+    watch_time_ms = Column(BigInteger, default=0)
+    reels_watched = Column(Integer, default=0)
+    words_saved = Column(Integer, default=0)
