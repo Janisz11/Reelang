@@ -63,6 +63,7 @@ import com.example.reelang.network.models.ProfileResponse
 import com.example.reelang.network.models.ReelResponse
 import com.example.reelang.ui.feed.bgColorsFor
 import com.example.reelang.ui.feed.sceneEmojiFor
+import com.example.reelang.ui.SharedState
 import com.example.reelang.ui.onboarding.ReelangBorder
 import com.example.reelang.ui.onboarding.ReelangCream
 import com.example.reelang.ui.onboarding.ReelangRed
@@ -130,7 +131,9 @@ class ProfileViewModel : ViewModel() {
 
     val statsComputed: WeeklyStats
         get() {
-            val s = _stats.value ?: return statsFallback
+            val s = _stats.value
+            Log.d("ProfileViewModel", "statsComputed called, _stats.value=$s")
+            if (s == null) return statsFallback
             return WeeklyStats(
                 vocabularyMastered = if (s.vocabularyMastered >= 1000)
                     "${s.vocabularyMastered / 1000}.${(s.vocabularyMastered % 1000) / 100}k"
@@ -148,6 +151,11 @@ class ProfileViewModel : ViewModel() {
         loadProfile()
         loadStats()
         loadUserReels()
+        viewModelScope.launch {
+            SharedState.profileRefreshTrigger.collect {
+                if (it > 0) loadProfile()
+            }
+        }
     }
 
     fun loadProfile() {
@@ -170,8 +178,9 @@ class ProfileViewModel : ViewModel() {
                 ApiClient.api.getMyStats(UserSession.userId)
             }.onSuccess {
                 _stats.value = it
+                Log.d("ProfileViewModel", "Stats loaded: streak=${it.streakDays}, vocab=${it.vocabularyMastered}")
             }.onFailure {
-                Log.e("ProfileViewModel", "Failed to load stats", it)
+                Log.e("ProfileViewModel", "Failed to load stats: ${it.message}", it)
             }
         }
     }

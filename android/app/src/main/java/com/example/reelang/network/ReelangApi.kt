@@ -4,7 +4,9 @@ import com.example.reelang.network.models.ActivityLogRequest
 import com.example.reelang.network.models.ActivityStatsResponse
 import com.example.reelang.network.models.CaptionSegment
 import com.example.reelang.network.models.FollowResponse
+import com.example.reelang.network.models.LikeResponse
 import com.example.reelang.network.models.ProfileResponse
+import com.example.reelang.network.models.WordLookupResponse
 import com.example.reelang.network.models.ProfileUpdateRequest
 import com.example.reelang.network.models.ReelResponse
 import com.example.reelang.network.models.SaveWordRequest
@@ -37,8 +39,27 @@ interface ReelangApi {
         @Query("language") language: String? = null,
         @Query("level") level: String? = null,
         @Query("topic") topic: String? = null,
-        @Query("tags") tags: String? = null
+        @Query("tags") tags: String? = null,
+        @Query("user_id") userId: String? = null
     ): List<ReelResponse>
+
+    @GET("feed")
+    suspend fun getFeed(
+        @Query("user_id") userId: String,
+        @Query("limit") limit: Int = 10
+    ): List<ReelResponse>
+
+    @POST("feed/consumed/{reelId}")
+    suspend fun markConsumed(
+        @Path("reelId") reelId: String,
+        @Query("user_id") userId: String
+    ): retrofit2.Response<Map<String, Any>>
+
+    @POST("reels/{reelId}/like")
+    suspend fun toggleLike(
+        @Path("reelId") reelId: String,
+        @Query("user_id") userId: String
+    ): LikeResponse
 
     @GET("reels/{id}/captions")
     suspend fun getCaptions(
@@ -60,6 +81,13 @@ interface ReelangApi {
     suspend fun getWordById(
         @Path("id") wordId: String
     ): WordResponse
+
+    @GET("words/lookup")
+    suspend fun lookupWord(
+        @Query("term") term: String,
+        @Query("language") language: String,
+        @Query("target_lang") targetLang: String = "en"
+    ): WordLookupResponse
 
     // ── Profiles ─────────────────────────────────────────────────────────────
 

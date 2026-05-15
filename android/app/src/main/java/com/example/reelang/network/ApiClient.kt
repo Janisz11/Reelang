@@ -8,15 +8,15 @@ import java.util.concurrent.TimeUnit
 
 object ApiClient {
 
-    const val BASE_URL = "https://coat-unrushed-blaming.ngrok-free.dev/api/v1/"
+    const val BASE_URL = "https://bikes-routines-tank-recruiting.trycloudflare.com/api/v1/"
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
 
     private val okHttpClient = OkHttpClient.Builder()
-        .addInterceptor(AuthInterceptor())   // stamps X-User-Id + Authorization on every request
-        .addInterceptor(loggingInterceptor)  // logs the already-stamped request
+        .addInterceptor(AuthInterceptor())
+        .addInterceptor(loggingInterceptor)
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(120, TimeUnit.SECONDS)

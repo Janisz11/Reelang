@@ -45,6 +45,7 @@ import com.example.reelang.ui.onboarding.OnboardingScreen
 import com.example.reelang.ui.search.SearchScreen
 import com.example.reelang.ui.reels.ReelsScreen
 import com.example.reelang.ui.profile.ProfileScreen
+import com.example.reelang.ui.profile.ProfileViewModel
 import com.example.reelang.ui.profile.StatsScreen
 import com.example.reelang.ui.words.WordDetailScreen
 import com.example.reelang.ui.words.WordsScreen
@@ -99,6 +100,8 @@ fun AppNavigation(
             }
         }
     ) { innerPadding ->
+        val profileViewModel: ProfileViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+
         NavHost(
             navController = navController,
             startDestination = startDestination,
@@ -163,12 +166,16 @@ fun AppNavigation(
                 ProfileScreen(
                     navController = navController,
                     modifier = Modifier.padding(innerPadding),
-                    onNavigateToStats = { navController.navigate("stats") }
+                    onNavigateToStats = { navController.navigate("stats") },
+                    viewModel = profileViewModel
                 )
             }
 
             composable("stats") {
-                StatsScreen(onBack = { navController.popBackStack() })
+                StatsScreen(
+                    onBack = { navController.popBackStack() },
+                    viewModel = profileViewModel
+                )
             }
 
             composable("profile/{userId}") {

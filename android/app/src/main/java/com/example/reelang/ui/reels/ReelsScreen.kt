@@ -15,9 +15,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.delay
 import com.example.reelang.network.models.CaptionSegment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -94,9 +98,40 @@ fun ReelsScreen(
                 if (sortedReels.isNotEmpty()) {
                     val pagerState = rememberPagerState { sortedReels.size }
                     val captionsMap by viewModel.captionsMap.collectAsState()
+                    val currentStreak by viewModel.currentStreak.collectAsState()
+
+                    val watchStartTime = remember { mutableStateOf(System.currentTimeMillis()) }
+                    val reelsWatchedSet = remember { mutableStateOf(setOf<String>()) }
 
                     LaunchedEffect(pagerState.settledPage) {
-                        viewModel.loadCaptions(sortedReels[pagerState.settledPage].id)
+                        val currentReel = sortedReels.getOrNull(pagerState.settledPage)
+                        if (currentReel != null) {
+                            viewModel.loadCaptions(currentReel.id)
+                            reelsWatchedSet.value = reelsWatchedSet.value + currentReel.id
+                        }
+                        val prevReel = sortedReels.getOrNull(pagerState.settledPage - 1)
+                        if (prevReel != null) {
+                            viewModel.markConsumed(prevReel.id)
+                        }
+                    }
+
+                    LaunchedEffect(Unit) {
+                        while (true) {
+                            delay(30_000)
+                            val watchTimeMs = System.currentTimeMillis() - watchStartTime.value
+                            viewModel.syncActivity(watchTimeMs, reelsWatchedSet.value.size)
+                            watchStartTime.value = System.currentTimeMillis()
+                            reelsWatchedSet.value = emptySet()
+                        }
+                    }
+
+                    DisposableEffect(Unit) {
+                        onDispose {
+                            val watchTimeMs = System.currentTimeMillis() - watchStartTime.value
+                            if (watchTimeMs > 1000) {
+                                viewModel.syncActivityBlocking(watchTimeMs, reelsWatchedSet.value.size)
+                            }
+                        }
                     }
 
                     VerticalPager(
@@ -105,7 +140,7 @@ fun ReelsScreen(
                     ) { page ->
                         val reel = sortedReels[page]
                         ReelCard(
-                            reel = reel,
+                            reel = reel.copy(streakDays = currentStreak),
                             captions = captionsMap[reel.id] ?: emptyList(),
                             isActive = pagerState.settledPage == page,
                             onLike = { viewModel.toggleLike(reel.id) },

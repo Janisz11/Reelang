@@ -53,12 +53,15 @@ import androidx.compose.ui.unit.sp
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.reelang.auth.UserSession
 import com.example.reelang.network.ApiClient
+import com.example.reelang.network.models.ActivityLogRequest
 import com.example.reelang.network.models.CaptionSegment
 import com.example.reelang.network.models.ReelResponse
 import com.example.reelang.network.models.SaveWordRequest
 import com.example.reelang.ui.words.WordsEventBus
 import com.example.reelang.ui.common.UiState
+import com.example.reelang.ui.SharedState
 import com.example.reelang.ui.onboarding.ReelangRed
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -130,15 +133,19 @@ class FeedViewModel : ViewModel() {
     private val _captionsMap = MutableStateFlow<Map<String, List<CaptionSegment>>>(emptyMap())
     val captionsMap: StateFlow<Map<String, List<CaptionSegment>>> = _captionsMap.asStateFlow()
 
+    private val _currentStreak = MutableStateFlow(0)
+    val currentStreak: StateFlow<Int> = _currentStreak.asStateFlow()
+
     init {
         loadReels()
+        loadStreak()
     }
 
     fun loadReels() {
         _uiState.value = UiState.Loading
         viewModelScope.launch {
             try {
-                val response = ApiClient.api.getReels()
+                val response = ApiClient.api.getFeed(userId = UserSession.userId)
                 Log.d("FeedViewModel", "Loaded ${response.size} reel(s): ${response.map { it.id }}")
                 Log.d("FeedViewModel", "youtubeIds: ${response.map { it.youtubeId }}")
                 val reels = response.map { it.toReelItem() }
@@ -172,12 +179,27 @@ class FeedViewModel : ViewModel() {
 
     fun toggleLike(id: String) {
         val list = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(list.map { reel ->
-            if (reel.id == id) reel.copy(
-                isLiked = !reel.isLiked,
-                likes = if (reel.isLiked) reel.likes - 1 else reel.likes + 1
-            ) else reel
-        })
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.toggleLike(id, UserSession.userId)
+            }.onSuccess { response ->
+                _uiState.value = UiState.Success(list.map { reel ->
+                    if (reel.id == id) reel.copy(
+                        isLiked = response.liked,
+                        likes = response.likesCount
+                    ) else reel
+                })
+                SharedState.triggerProfileRefresh()
+            }.onFailure {
+                Log.e("FeedViewModel", "Failed to toggle like", it)
+                _uiState.value = UiState.Success(list.map { reel ->
+                    if (reel.id == id) reel.copy(
+                        isLiked = !reel.isLiked,
+                        likes = if (reel.isLiked) reel.likes - 1 else reel.likes + 1
+                    ) else reel
+                })
+            }
+        }
     }
 
     private val _savedTerms = mutableSetOf<String>()
@@ -209,6 +231,16 @@ class FeedViewModel : ViewModel() {
         }
     }
 
+    fun markConsumed(reelId: String) {
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.markConsumed(reelId, UserSession.userId)
+            }.onFailure {
+                Log.w("FeedViewModel", "Failed to mark consumed: $reelId")
+            }
+        }
+    }
+
     fun toggleSave(id: String) {
         val list = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(list.map { reel ->
@@ -219,6 +251,48 @@ class FeedViewModel : ViewModel() {
         })
     }
 
+    fun loadStreak() {
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.getMyStats(UserSession.userId)
+            }.onSuccess {
+                _currentStreak.value = it.streakDays
+            }
+        }
+    }
+
+    fun syncActivity(watchTimeMs: Long, reelsWatched: Int) {
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.logActivity(
+                    userId = UserSession.userId,
+                    body = ActivityLogRequest(
+                        watchTimeMs = watchTimeMs,
+                        reelsWatched = reelsWatched,
+                        wordsSaved = 0
+                    )
+                )
+            }.onFailure {
+                Log.e("FeedViewModel", "Failed to sync activity", it)
+            }
+        }
+    }
+
+    fun syncActivityBlocking(watchTimeMs: Long, reelsWatched: Int) {
+        kotlinx.coroutines.GlobalScope.launch {
+            runCatching {
+                ApiClient.api.logActivity(
+                    userId = UserSession.userId,
+                    body = ActivityLogRequest(
+                        watchTimeMs = watchTimeMs,
+                        reelsWatched = reelsWatched,
+                        wordsSaved = 0
+                    )
+                )
+            }
+        }
+    }
+
     private fun ReelResponse.toReelItem() = ReelItem(
         id = id,
         channelName = channelName ?: "",
@@ -226,14 +300,15 @@ class FeedViewModel : ViewModel() {
         originalText = originalText,
         translatedText = translatedText,
         clickableWord = clickableWord,
-        likes = likes,
+        likes = likesCount,
         saves = saves,
         level = level ?: "",
         streakDays = streakDays,
         language = language,
         bgColors = bgColorsFor(language),
         sceneEmoji = sceneEmojiFor(language),
-        youtubeId = youtubeId
+        youtubeId = youtubeId,
+        isLiked = isLiked
     )
 }
 

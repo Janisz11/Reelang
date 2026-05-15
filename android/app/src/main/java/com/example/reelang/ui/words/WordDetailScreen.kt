@@ -20,12 +20,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -56,6 +53,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextAlign
+import com.example.reelang.network.models.WordLookupResponse
 import com.example.reelang.ui.onboarding.ReelangBorder
 import com.example.reelang.ui.onboarding.ReelangCream
 import com.example.reelang.ui.onboarding.ReelangRed
@@ -80,9 +87,12 @@ data class WordDetail(
     val term: String,
     val phonetic: String,
     val partOfSpeech: String,
+    val definition: String,
+    val translation: String,
     val translations: List<Translation>,
     val contextQuotes: List<ContextQuote>,
-    val variations: List<Variation>
+    val variations: List<Variation>,
+    val language: String = ""
 )
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
@@ -100,7 +110,15 @@ class WordDetailViewModel(private val wordId: String) : ViewModel() {
         _uiState.value = UiState.Loading
         viewModelScope.launch {
             try {
-                val detail = ApiClient.api.getWordById(wordId).toWordDetail()
+                val wordResponse = ApiClient.api.getWordById(wordId)
+                val lookup = try {
+                    ApiClient.api.lookupWord(
+                        term = wordResponse.term,
+                        language = wordResponse.language,
+                        targetLang = "en"
+                    )
+                } catch (e: Exception) { null }
+                val detail = wordResponse.toWordDetail(lookup)
                 _uiState.value = UiState.Success(detail)
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Failed to load word")
@@ -108,14 +126,19 @@ class WordDetailViewModel(private val wordId: String) : ViewModel() {
         }
     }
 
-    private fun WordResponse.toWordDetail() = WordDetail(
+    private fun WordResponse.toWordDetail(lookup: WordLookupResponse?) = WordDetail(
         id = id,
         term = term,
         phonetic = "",
         partOfSpeech = "",
-        translations = emptyList(),
+        definition = lookup?.definition ?: definition ?: "",
+        translation = lookup?.translation ?: "",
+        translations = if (lookup?.translation != null)
+            listOf(Translation("EN", lookup.translation))
+        else emptyList(),
         contextQuotes = emptyList(),
-        variations = emptyList()
+        variations = emptyList(),
+        language = language
     )
 }
 
@@ -144,8 +167,7 @@ fun WordDetailScreen(
                 partOfSpeech = (uiState as? UiState.Success)?.data?.partOfSpeech ?: "",
                 onBack = onBack
             )
-        },
-        bottomBar = { WordDetailBottomBar() }
+        }
     ) { innerPadding ->
         when (val state = uiState) {
             is UiState.Loading -> {
@@ -189,7 +211,9 @@ fun WordDetailScreen(
                 ) {
                     item { HeroSection(detail) }
                     item { Spacer(Modifier.height(8.dp)) }
+                    item { FlashcardSection(detail) }
                     if (detail.contextQuotes.isNotEmpty()) {
+                        item { Spacer(Modifier.height(8.dp)) }
                         item { ContextSection(detail.contextQuotes) }
                         item { Spacer(Modifier.height(8.dp)) }
                     }
@@ -357,6 +381,123 @@ private fun TranslationChip(translation: Translation) {
     }
 }
 
+// ─── Flashcard ────────────────────────────────────────────────────────────────
+
+@Composable
+private fun FlashcardSection(detail: WordDetail) {
+    var isFlipped by remember { mutableStateOf(false) }
+    val rotation by animateFloatAsState(
+        targetValue = if (isFlipped) 180f else 0f,
+        animationSpec = tween(400, easing = FastOutSlowInEasing),
+        label = "flip"
+    )
+
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        Text(
+            text = "Flashcard",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = ReelangTextPrimary
+        )
+        Spacer(Modifier.height(10.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(160.dp)
+                .graphicsLayer {
+                    rotationY = rotation
+                    cameraDistance = 12f * density
+                }
+                .clickable { isFlipped = !isFlipped },
+            contentAlignment = Alignment.Center
+        ) {
+            if (rotation <= 90f) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = ReelangRed,
+                    shadowElevation = 4.dp
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = detail.term,
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = detail.language.uppercase(),
+                            fontSize = 12.sp,
+                            color = Color.White.copy(alpha = 0.7f),
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = "tap to flip",
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            } else {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { rotationY = 180f },
+                    shape = RoundedCornerShape(16.dp),
+                    color = ReelangSurface,
+                    shadowElevation = 4.dp
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = detail.translation.ifEmpty { "No translation available" },
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = ReelangTextPrimary,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "EN",
+                            fontSize = 12.sp,
+                            color = ReelangTextSecondary,
+                            letterSpacing = 1.sp
+                        )
+                        if (detail.definition.isNotEmpty()) {
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                text = detail.definition,
+                                fontSize = 13.sp,
+                                color = ReelangTextSecondary,
+                                textAlign = TextAlign.Center,
+                                maxLines = 3
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = if (isFlipped) "showing translation" else "showing original",
+            fontSize = 11.sp,
+            color = ReelangTextSecondary,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
+    }
+}
+
 // ─── In Context ───────────────────────────────────────────────────────────────
 
 @Composable
@@ -478,43 +619,6 @@ private fun VariationCard(variation: Variation, modifier: Modifier = Modifier) {
                 fontWeight = FontWeight.SemiBold,
                 color = ReelangTextPrimary
             )
-        }
-    }
-}
-
-// ─── Bottom Bar ───────────────────────────────────────────────────────────────
-
-@Composable
-private fun WordDetailBottomBar() {
-    Column {
-        HorizontalDivider(color = ReelangBorder, thickness = 1.dp)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(ReelangSurface)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OutlinedButton(
-                onClick = { /* TODO: skip */ },
-                modifier = Modifier.weight(1f),
-                border = BorderStroke(1.dp, ReelangRed),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = ReelangRed),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Skip word", fontWeight = FontWeight.SemiBold)
-            }
-            Button(
-                onClick = { /* TODO: save */ },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ReelangRed,
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Save word", fontWeight = FontWeight.SemiBold)
-            }
         }
     }
 }
