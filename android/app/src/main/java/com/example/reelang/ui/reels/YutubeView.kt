@@ -47,9 +47,20 @@ fun YouTubeView(
                 """
                 try {
                     if (window.player) {
-                        window.player.mute();
+                        window.player.unMute();
+                        window.player.setVolume(100);
                         window.player.playVideo();
-                        setTimeout(function() { window.player.unMute(); }, 300);
+                    }
+                } catch(e) {}
+                """
+            ) { }
+            delay(800)
+            webViewRef.value?.evaluateJavascript(
+                """
+                try {
+                    if (window.player) {
+                        window.player.unMute();
+                        window.player.setVolume(100);
                     }
                 } catch(e) {}
                 """

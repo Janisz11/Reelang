@@ -24,7 +24,10 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import com.example.reelang.ui.feed.FeedViewModel
+import com.example.reelang.ui.feed.FeedViewModelFactory
 import androidx.compose.ui.Alignment
 import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.ui.Modifier
@@ -192,6 +195,21 @@ fun AppNavigation(
                     bottomPadding = innerPadding.calculateBottomPadding(),
                     onWordClick = { wordId -> navController.toWordDetail(wordId) },
                     priorityReelIds = reelIds.split(",").filter { it.isNotEmpty() }
+                )
+            }
+
+            composable("saved_reel/{reelId}") { backStack ->
+                val reelId = backStack.arguments?.getString("reelId") ?: ""
+                val savedFeedViewModel: FeedViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+                    factory = FeedViewModelFactory(autoLoad = false)
+                )
+                LaunchedEffect(reelId) {
+                    savedFeedViewModel.loadSingleReel(reelId)
+                }
+                ReelsScreen(
+                    bottomPadding = innerPadding.calculateBottomPadding(),
+                    onWordClick = { wordId -> navController.toWordDetail(wordId) },
+                    viewModel = savedFeedViewModel
                 )
             }
 

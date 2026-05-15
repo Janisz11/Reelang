@@ -40,6 +40,7 @@ class ReelResponse(BaseModel):
     tags: Optional[str] = None
     likes_count: int = 0
     is_liked: bool = False
+    is_saved: bool = False
     created_at: datetime
 
     class Config:

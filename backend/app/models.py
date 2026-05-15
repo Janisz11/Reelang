@@ -95,6 +95,14 @@ class ReelLike(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class SavedReel(Base):
+    __tablename__ = "saved_reels"
+
+    user_id = Column(String, nullable=False, primary_key=True)
+    reel_id = Column(String, ForeignKey("reels.id", ondelete="CASCADE"), nullable=False, primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class ActivityLog(Base):
     __tablename__ = "activity_logs"
 

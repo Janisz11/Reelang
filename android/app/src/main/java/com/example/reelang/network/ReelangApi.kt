@@ -6,6 +6,7 @@ import com.example.reelang.network.models.CaptionSegment
 import com.example.reelang.network.models.FollowResponse
 import com.example.reelang.network.models.LikeResponse
 import com.example.reelang.network.models.ProfileResponse
+import com.example.reelang.network.models.SaveResponse
 import com.example.reelang.network.models.WordLookupResponse
 import com.example.reelang.network.models.ProfileUpdateRequest
 import com.example.reelang.network.models.ReelResponse
@@ -43,6 +44,11 @@ interface ReelangApi {
         @Query("user_id") userId: String? = null
     ): List<ReelResponse>
 
+    @POST("feed/refill")
+    suspend fun triggerAgentRefill(
+        @Query("user_id") userId: String
+    ): retrofit2.Response<Unit>
+
     @GET("feed")
     suspend fun getFeed(
         @Query("user_id") userId: String,
@@ -54,6 +60,22 @@ interface ReelangApi {
         @Path("reelId") reelId: String,
         @Query("user_id") userId: String
     ): retrofit2.Response<Map<String, Any>>
+
+    @GET("reels/{reelId}")
+    suspend fun getReelById(
+        @Path("reelId") reelId: String
+    ): ReelResponse
+
+    @POST("reels/{reelId}/save")
+    suspend fun toggleSave(
+        @Path("reelId") reelId: String,
+        @Query("user_id") userId: String
+    ): SaveResponse
+
+    @GET("reels/saved")
+    suspend fun getSavedReels(
+        @Query("user_id") userId: String
+    ): List<ReelResponse>
 
     @POST("reels/{reelId}/like")
     suspend fun toggleLike(

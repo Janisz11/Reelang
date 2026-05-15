@@ -32,6 +32,7 @@ services:
     volumes:
       - .:/app
       - video_cache:/tmp/reels
+      - thumbnails_cache:/tmp/thumbnails
     command: >
       sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     healthcheck:
@@ -60,3 +61,4 @@ services:
 volumes:
   postgres_data:
   video_cache:
+  thumbnails_cache:

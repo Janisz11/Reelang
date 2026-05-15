@@ -1,3 +1,4 @@
+import logging
 from typing import List
 
 from fastapi import APIRouter, Depends, Query
@@ -5,10 +6,11 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Reel
+from ..models import Reel, ReelLike, SavedReel
 from ..schemas import ReelResponse
 
 router = APIRouter(prefix="/feed", tags=["feed"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=List[ReelResponse])
@@ -17,7 +19,7 @@ def get_feed(
     limit: int = Query(10, ge=1, le=20),
     db: Session = Depends(get_db),
 ):
-    """Return user's personalized feed queue, falling back to latest reels."""
+   
     rows = db.execute(
         text("""
             SELECT r.* FROM user_feed_queue q
@@ -29,10 +31,27 @@ def get_feed(
         {"uid": user_id, "limit": limit},
     ).fetchall()
 
-    if not rows:
-        return db.query(Reel).order_by(Reel.created_at.desc()).limit(limit).all()
+    liked_ids = {
+        r.reel_id for r in db.query(ReelLike).filter(ReelLike.user_id == user_id).all()
+    }
+    saved_ids = {
+        r.reel_id for r in db.query(SavedReel).filter(SavedReel.user_id == user_id).all()
+    }
 
-    return [dict(r._mapping) for r in rows]
+    if not rows:
+        reels = db.query(Reel).order_by(Reel.created_at.desc()).limit(limit).all()
+        result = []
+        for reel in reels:
+            d = {c.name: getattr(reel, c.name) for c in reel.__table__.columns}
+            d["is_liked"] = reel.id in liked_ids
+            d["is_saved"] = reel.id in saved_ids
+            result.append(d)
+        return result
+
+    return [
+        dict(r._mapping) | {"is_liked": r.id in liked_ids, "is_saved": r.id in saved_ids}
+        for r in rows
+    ]
 
 
 @router.post("/consumed/{reel_id}")
@@ -41,7 +60,7 @@ def mark_consumed(
     user_id: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    """Mark a reel as consumed (watched) in the feed queue."""
+   
     db.execute(
         text("""
             UPDATE user_feed_queue
@@ -61,3 +80,31 @@ def mark_consumed(
     ).scalar()
 
     return {"ok": True, "remaining_queue": remaining}
+
+
+@router.post("/refill")
+def trigger_refill(
+    user_id: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    """Check queue size and trigger AI agent refill if needed."""
+    import httpx
+
+    remaining = db.execute(
+        text(
+            "SELECT COUNT(*) FROM user_feed_queue WHERE user_id = :uid AND consumed = false"
+        ),
+        {"uid": user_id},
+    ).scalar()
+
+    if remaining < 5:
+        try:
+            resp = httpx.post(
+                f"http://reelang_ai:8001/trigger/{user_id}",
+                timeout=5.0,
+            )
+            logger.info(f"Agent trigger response: {resp.status_code}")
+        except Exception as e:
+            logger.warning(f"Agent trigger failed: {e}")
+
+    return {"remaining": remaining, "refill_needed": remaining < 5}

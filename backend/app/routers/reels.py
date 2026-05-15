@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import CaptionSegment, Reel, ReelLike, Profile
+from ..models import CaptionSegment, Reel, ReelLike, SavedReel, Profile
 from ..schemas import (
     CaptionSegmentResponse,
     ReelDetailResponse,
@@ -226,17 +226,37 @@ def list_reels(
 
     if user_id:
         liked_ids = {
-            like.reel_id
-            for like in db.query(ReelLike).filter(ReelLike.user_id == user_id).all()
+            r.reel_id for r in db.query(ReelLike).filter(ReelLike.user_id == user_id).all()
+        }
+        saved_ids = {
+            r.reel_id for r in db.query(SavedReel).filter(SavedReel.user_id == user_id).all()
         }
         result = []
         for reel in reels:
             d = {c.name: getattr(reel, c.name) for c in reel.__table__.columns}
             d["is_liked"] = reel.id in liked_ids
+            d["is_saved"] = reel.id in saved_ids
             result.append(d)
         return result
 
     return reels
+
+
+# ── GET /reels/saved ──────────────────────────────────────────────────────────
+
+@router.get("/saved", response_model=List[ReelResponse])
+def get_saved_reels(user_id: str = Query(...), db: Session = Depends(get_db)):
+    from sqlalchemy import text
+    rows = db.execute(
+        text("""
+            SELECT r.* FROM saved_reels s
+            JOIN reels r ON r.id = s.reel_id
+            WHERE s.user_id = :uid
+            ORDER BY s.created_at DESC
+        """),
+        {"uid": user_id},
+    ).fetchall()
+    return [dict(r._mapping) | {"is_saved": True} for r in rows]
 
 
 # ── GET /reels/user/{user_id} ─────────────────────────────────────────────────
@@ -286,6 +306,33 @@ def toggle_like(
             owner.total_likes += 1
     db.commit()
     return {"liked": True, "likes_count": reel.likes_count}
+
+
+# ── POST /reels/{reel_id}/save ────────────────────────────────────────────────
+
+@router.post("/{reel_id}/save")
+def toggle_save(
+    reel_id: str,
+    user_id: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    reel = db.query(Reel).filter(Reel.id == reel_id).first()
+    if not reel:
+        raise HTTPException(status_code=404, detail="Reel not found")
+
+    existing = db.query(SavedReel).filter(
+        SavedReel.user_id == user_id,
+        SavedReel.reel_id == reel_id,
+    ).first()
+
+    if existing:
+        db.delete(existing)
+        db.commit()
+        return {"saved": False}
+
+    db.add(SavedReel(user_id=user_id, reel_id=reel_id, created_at=datetime.utcnow()))
+    db.commit()
+    return {"saved": True}
 
 
 # ── GET /reels/{reel_id} ───────────────────────────────────────────────────────

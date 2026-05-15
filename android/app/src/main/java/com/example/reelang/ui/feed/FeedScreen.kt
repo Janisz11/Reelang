@@ -124,7 +124,7 @@ internal fun sceneEmojiFor(language: String): String = when (language.lowercase(
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
 
-class FeedViewModel : ViewModel() {
+class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState<List<ReelItem>>>(UiState.Loading)
     val uiState: StateFlow<UiState<List<ReelItem>>> = _uiState.asStateFlow()
@@ -137,8 +137,25 @@ class FeedViewModel : ViewModel() {
     val currentStreak: StateFlow<Int> = _currentStreak.asStateFlow()
 
     init {
-        loadReels()
-        loadStreak()
+        if (autoLoad) {
+            loadReels()
+            loadStreak()
+            triggerAgentRefill()
+        }
+    }
+
+    fun loadSingleReel(reelId: String) {
+        _uiState.value = UiState.Loading
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.getReelById(reelId)
+            }.onSuccess { reel ->
+                _uiState.value = UiState.Success(listOf(reel.toReelItem()))
+            }.onFailure {
+                Log.e("FeedViewModel", "Failed to load single reel", it)
+                _uiState.value = UiState.Error("Failed to load reel")
+            }
+        }
     }
 
     fun loadReels() {
@@ -231,6 +248,20 @@ class FeedViewModel : ViewModel() {
         }
     }
 
+    fun triggerAgentRefill() {
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.triggerAgentRefill(UserSession.userId)
+            }.onSuccess {
+                Log.d("FeedViewModel", "Agent refill triggered")
+                delay(3000)
+                loadReels()
+            }.onFailure {
+                Log.w("FeedViewModel", "Agent refill trigger failed (non-critical)")
+            }
+        }
+    }
+
     fun markConsumed(reelId: String) {
         viewModelScope.launch {
             runCatching {
@@ -243,12 +274,27 @@ class FeedViewModel : ViewModel() {
 
     fun toggleSave(id: String) {
         val list = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(list.map { reel ->
-            if (reel.id == id) reel.copy(
-                isSaved = !reel.isSaved,
-                saves = if (reel.isSaved) reel.saves - 1 else reel.saves + 1
-            ) else reel
-        })
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.toggleSave(id, UserSession.userId)
+            }.onSuccess { response ->
+                _uiState.value = UiState.Success(list.map { reel ->
+                    if (reel.id == id) reel.copy(
+                        isSaved = response.saved,
+                        saves = if (response.saved) reel.saves + 1 else reel.saves - 1
+                    ) else reel
+                })
+                SharedState.triggerProfileRefresh()
+            }.onFailure {
+                Log.e("FeedViewModel", "Failed to toggle save", it)
+                _uiState.value = UiState.Success(list.map { reel ->
+                    if (reel.id == id) reel.copy(
+                        isSaved = !reel.isSaved,
+                        saves = if (reel.isSaved) reel.saves - 1 else reel.saves + 1
+                    ) else reel
+                })
+            }
+        }
     }
 
     fun loadStreak() {
@@ -310,6 +356,12 @@ class FeedViewModel : ViewModel() {
         youtubeId = youtubeId,
         isLiked = isLiked
     )
+}
+
+class FeedViewModelFactory(private val autoLoad: Boolean) : androidx.lifecycle.ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
+        FeedViewModel(autoLoad) as T
 }
 
 // ─── Top Bar ──────────────────────────────────────────────────────────────────

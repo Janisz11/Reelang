@@ -115,6 +115,9 @@ class ProfileViewModel : ViewModel() {
     private val _userReels = MutableStateFlow<List<ReelResponse>>(emptyList())
     val userReels: StateFlow<List<ReelResponse>> = _userReels.asStateFlow()
 
+    private val _savedReels = MutableStateFlow<List<ReelResponse>>(emptyList())
+    val savedReels: StateFlow<List<ReelResponse>> = _savedReels.asStateFlow()
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -151,9 +154,13 @@ class ProfileViewModel : ViewModel() {
         loadProfile()
         loadStats()
         loadUserReels()
+        loadSavedReels()
         viewModelScope.launch {
             SharedState.profileRefreshTrigger.collect {
-                if (it > 0) loadProfile()
+                if (it > 0) {
+                    loadProfile()
+                    loadSavedReels()
+                }
             }
         }
     }
@@ -196,6 +203,18 @@ class ProfileViewModel : ViewModel() {
             }
         }
     }
+
+    fun loadSavedReels() {
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.getSavedReels(UserSession.userId)
+            }.onSuccess {
+                _savedReels.value = it
+            }.onFailure {
+                Log.e("ProfileViewModel", "Failed to load saved reels", it)
+            }
+        }
+    }
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -211,20 +230,36 @@ fun ProfileScreen(
 ) {
     val profile by viewModel.profile.collectAsState()
     val userReels by viewModel.userReels.collectAsState()
+    val savedReels by viewModel.savedReels.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
 
-    val postsGrid = userReels.map { reel ->
+    val userReelThumbnails = userReels.map { reel ->
         PostThumbnail(
             id = reel.id,
             color = bgColorsFor(reel.language).first(),
             emoji = sceneEmojiFor(reel.language),
-            thumbnailUrl = if (reel.thumbnailUrl != null)
-                "${ApiClient.BASE_URL}reels/${reel.id}/thumbnail"
-            else null,
+            thumbnailUrl = when {
+                reel.thumbnailUrl == null -> null
+                reel.thumbnailUrl.startsWith("http") -> reel.thumbnailUrl
+                else -> "${ApiClient.BASE_URL}${reel.thumbnailUrl.trimStart('/')}"
+            },
             reelId = reel.id
         )
     }
-    val gridItems = if (selectedTab == 0) postsGrid else emptyList()
+    val savedPostThumbnails = savedReels.map { reel ->
+        PostThumbnail(
+            id = reel.id,
+            color = bgColorsFor(reel.language).first(),
+            emoji = sceneEmojiFor(reel.language),
+            thumbnailUrl = when {
+                reel.thumbnailUrl == null -> null
+                reel.thumbnailUrl.startsWith("http") -> reel.thumbnailUrl
+                else -> "${ApiClient.BASE_URL}${reel.thumbnailUrl.trimStart('/')}"
+            },
+            reelId = reel.id
+        )
+    }
+    val gridItems = if (selectedTab == 0) userReelThumbnails else savedPostThumbnails
 
     Scaffold(
         modifier = modifier,
@@ -295,9 +330,13 @@ fun ProfileScreen(
                 ThumbnailGrid(
                     items = gridItems,
                     onReelClick = { reelId ->
-                        val allIds = gridItems.mapNotNull { it.reelId }
-                        val orderedIds = listOf(reelId) + allIds.filter { it != reelId }
-                        navController.navigate("feed_from_search/${orderedIds.joinToString(",")}")
+                        if (selectedTab == 0) {
+                            val allIds = gridItems.mapNotNull { it.reelId }
+                            val orderedIds = listOf(reelId) + allIds.filter { it != reelId }
+                            navController.navigate("feed_from_search/${orderedIds.joinToString(",")}")
+                        } else {
+                            navController.navigate("saved_reel/$reelId")
+                        }
                     }
                 )
             }
