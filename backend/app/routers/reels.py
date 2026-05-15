@@ -4,6 +4,7 @@ import logging
 import re
 import subprocess
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -12,7 +13,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import CaptionSegment, Reel
+from ..models import CaptionSegment, Reel, ReelLike, Profile
 from ..schemas import (
     CaptionSegmentResponse,
     ReelDetailResponse,
@@ -25,7 +26,7 @@ from ..services import yt_dlp_service, translation_service
 from ..services.whisper_service import transcribe_audio, transcribe_file
 
 UPLOAD_DIR = Path("/tmp/reels")
-CHUNK_SIZE = 1024 * 1024  # 1 MB
+CHUNK_SIZE = 1024 * 1024  # 1mb
 
 router = APIRouter(prefix="/reels", tags=["reels"])
 logger = logging.getLogger(__name__)
@@ -89,7 +90,7 @@ async def import_reel(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    # 1. Fetch metadata only (no video download)
+   
     try:
         info = yt_dlp_service.fetch_video_info(payload.youtube_url)
     except Exception as exc:
@@ -98,12 +99,12 @@ async def import_reel(
     meta = yt_dlp_service.extract_metadata(info)
     youtube_id = meta["youtube_id"]
 
-    # 2. Return existing reel if already imported
+   
     existing = db.query(Reel).filter(Reel.youtube_id == youtube_id).first()
     if existing:
         return ReelImportResponse(reel_id=existing.id, stream_url=None, captions_count=0)
 
-    # 3. Persist Reel
+    
     reel = Reel(
         **meta,
         language=payload.language.lower(),
@@ -114,7 +115,7 @@ async def import_reel(
     db.commit()
     db.refresh(reel)
 
-    # 4. Transcribe in background
+   
     background_tasks.add_task(
         transcribe_and_save_captions,
         reel.id,
@@ -207,6 +208,7 @@ def list_reels(
     tags: Optional[str] = Query(None),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    user_id: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     from sqlalchemy import or_
@@ -220,7 +222,21 @@ def list_reels(
     if tags:
         tag_list = [t.strip() for t in tags.split(",")]
         q = q.filter(or_(*[Reel.tags.contains(tag) for tag in tag_list]))
-    return q.order_by(Reel.created_at.desc()).offset(offset).limit(limit).all()
+    reels = q.order_by(Reel.created_at.desc()).offset(offset).limit(limit).all()
+
+    if user_id:
+        liked_ids = {
+            like.reel_id
+            for like in db.query(ReelLike).filter(ReelLike.user_id == user_id).all()
+        }
+        result = []
+        for reel in reels:
+            d = {c.name: getattr(reel, c.name) for c in reel.__table__.columns}
+            d["is_liked"] = reel.id in liked_ids
+            result.append(d)
+        return result
+
+    return reels
 
 
 # ── GET /reels/user/{user_id} ─────────────────────────────────────────────────
@@ -233,6 +249,43 @@ def get_user_reels(user_id: str, db: Session = Depends(get_db)):
         .order_by(Reel.created_at.desc())
         .all()
     )
+
+
+# ── POST /reels/{reel_id}/like ────────────────────────────────────────────────
+
+@router.post("/{reel_id}/like")
+def toggle_like(
+    reel_id: str,
+    user_id: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    reel = db.query(Reel).filter(Reel.id == reel_id).first()
+    if not reel:
+        raise HTTPException(status_code=404, detail="Reel not found")
+
+    existing = db.query(ReelLike).filter(
+        ReelLike.user_id == user_id,
+        ReelLike.reel_id == reel_id,
+    ).first()
+
+    if existing:
+        db.delete(existing)
+        reel.likes_count = max(0, reel.likes_count - 1)
+        if reel.owner_user_id:
+            owner = db.query(Profile).filter(Profile.user_id == reel.owner_user_id).first()
+            if owner:
+                owner.total_likes = max(0, owner.total_likes - 1)
+        db.commit()
+        return {"liked": False, "likes_count": reel.likes_count}
+
+    db.add(ReelLike(user_id=user_id, reel_id=reel_id, created_at=datetime.utcnow()))
+    reel.likes_count += 1
+    if reel.owner_user_id:
+        owner = db.query(Profile).filter(Profile.user_id == reel.owner_user_id).first()
+        if owner:
+            owner.total_likes += 1
+    db.commit()
+    return {"liked": True, "likes_count": reel.likes_count}
 
 
 # ── GET /reels/{reel_id} ───────────────────────────────────────────────────────

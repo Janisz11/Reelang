@@ -38,6 +38,8 @@ class ReelResponse(BaseModel):
     level: Optional[str]
     topic: Optional[str]
     tags: Optional[str] = None
+    likes_count: int = 0
+    is_liked: bool = False
     created_at: datetime
 
     class Config:
@@ -88,5 +90,5 @@ class WordResponse(BaseModel):
         from_attributes = True
 
 
-# Resolve forward reference
+
 ReelDetailResponse.model_rebuild()

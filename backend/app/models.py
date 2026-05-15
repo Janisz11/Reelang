@@ -24,6 +24,7 @@ class Reel(Base):
     topic = Column(String, nullable=True, index=True)
     tags = Column(String, nullable=True)
     owner_user_id = Column(String, nullable=True)
+    likes_count = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     segments = relationship("CaptionSegment", back_populates="reel", cascade="all, delete-orphan")
@@ -83,6 +84,14 @@ class Follow(Base):
 
     follower_id = Column(String, nullable=False, primary_key=True)
     following_id = Column(String, nullable=False, primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ReelLike(Base):
+    __tablename__ = "reel_likes"
+
+    user_id = Column(String, nullable=False, primary_key=True)
+    reel_id = Column(String, ForeignKey("reels.id", ondelete="CASCADE"), nullable=False, primary_key=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 

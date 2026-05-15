@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -48,6 +48,37 @@ def add_word(payload: WordCreateRequest, db: Session = Depends(get_db)):
     return word
 
 
+# ── GET /words/lookup ─────────────────────────────────────────────────────────
+
+@router.get("/lookup")
+def lookup_word(
+    term: str = Query(...),
+    language: str = Query(...),
+    target_lang: str = Query("en"),
+    db: Session = Depends(get_db),
+):
+    import re
+    from ..services.dictionary_service import fetch_definition
+    from ..services.translation_service import translate_text
+
+    clean_term = re.sub(r'^[¿¡\W]+', '', term.strip())
+
+    definition = fetch_definition(clean_term, language)
+
+    translation = None
+    if language.lower() != target_lang.lower():
+        translation = translate_text(clean_term, language.lower(), target_lang.lower())
+
+    return {
+        "term": term,
+        "clean_term": clean_term,
+        "language": language,
+        "definition": definition,
+        "translation": translation,
+        "target_lang": target_lang,
+    }
+
+
 # ── GET /words ────────────────────────────────────────────────────────────────
 
 @router.get("", response_model=List[WordResponse])
@@ -58,3 +89,13 @@ def list_words(db: Session = Depends(get_db)):
         .order_by(Word.created_at.desc())
         .all()
     )
+
+
+# ── GET /words/{word_id} ──────────────────────────────────────────────────────
+
+@router.get("/{word_id}", response_model=WordResponse)
+def get_word(word_id: str, db: Session = Depends(get_db)):
+    word = db.query(Word).filter(Word.id == word_id).first()
+    if not word:
+        raise HTTPException(status_code=404, detail="Word not found")
+    return word

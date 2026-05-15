@@ -1,12 +1,12 @@
 import uuid
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import ActivityLog
+from ..models import ActivityLog, Profile
 
 router = APIRouter(prefix="/activity", tags=["activity"])
 
@@ -29,6 +29,9 @@ def log_activity(
         .filter(ActivityLog.user_id == user_id, ActivityLog.date == today)
         .first()
     )
+
+    was_active_today = log is not None and log.reels_watched > 0
+
     if log:
         log.watch_time_ms += payload.watch_time_ms
         log.reels_watched += payload.reels_watched
@@ -43,5 +46,33 @@ def log_activity(
             words_saved=payload.words_saved,
         )
         db.add(log)
+
+    db.flush()
+
+    if payload.reels_watched > 0 and not was_active_today:
+        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        if not profile:
+            profile = Profile(
+                user_id=user_id,
+                username=f"user_{user_id[:8]}",
+                avatar_initials=user_id[:2].upper(),
+                created_at=datetime.utcnow(),
+                streak_days=0,
+            )
+            db.add(profile)
+            db.flush()
+
+        yesterday = today - timedelta(days=1)
+        yesterday_log = (
+            db.query(ActivityLog)
+            .filter(ActivityLog.user_id == user_id, ActivityLog.date == yesterday)
+            .first()
+        )
+
+        if yesterday_log and yesterday_log.reels_watched > 0:
+            profile.streak_days += 1
+        else:
+            profile.streak_days = 1
+
     db.commit()
     return {"ok": True}

@@ -77,9 +77,11 @@ def get_my_stats(user_id: str = Query(...), db: Session = Depends(get_db)):
     )
     hours_watched = round(total_watch_ms / 3_600_000, 1)
 
+    # Weekly activity (last 7 days) - based on watch time in minutes
+    # Full bar = CAP_MINUTES; bar grows every 30 min, capped at 1.0
+    CAP_MINUTES = 120
     today = date.today()
     day_data: dict[date, int] = {}
-    max_words = 1
     for i in range(6, -1, -1):
         d = today - timedelta(days=i)
         log = (
@@ -87,13 +89,14 @@ def get_my_stats(user_id: str = Query(...), db: Session = Depends(get_db)):
             .filter(ActivityLog.user_id == user_id, ActivityLog.date == d)
             .first()
         )
-        words = log.words_saved if log else 0
-        day_data[d] = words
-        if words > max_words:
-            max_words = words
+        minutes = int((log.watch_time_ms or 0) / 60000) if log else 0
+        day_data[d] = minutes
 
     weekly_activity = [
-        {"day": (today - timedelta(days=i)).strftime("%a"), "value": day_data[today - timedelta(days=i)] / max_words}
+        {
+            "day": (today - timedelta(days=i)).strftime("%a"),
+            "value": min(day_data[today - timedelta(days=i)] / CAP_MINUTES, 1.0),
+        }
         for i in range(6, -1, -1)
     ]
 
