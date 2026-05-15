@@ -57,6 +57,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
+import com.example.reelang.auth.UserSession
 import com.example.reelang.network.ApiClient
 import com.example.reelang.ui.onboarding.ReelangBorder
 import com.example.reelang.ui.onboarding.ReelangCream
@@ -90,7 +91,7 @@ class CreateReelViewModel : ViewModel() {
 
     private val _uploadState = MutableStateFlow<UploadState>(UploadState.Idle)
     val uploadState: StateFlow<UploadState> = _uploadState.asStateFlow()
-    fun uploadReel(videoFile: File, title: String, language: String) {
+    fun uploadReel(videoFile: File, title: String, language: String, tags: String = "") {
         viewModelScope.launch {
             _uploadState.value = UploadState.Loading
             try {
@@ -101,7 +102,9 @@ class CreateReelViewModel : ViewModel() {
                 )
                 val titleBody = title.toRequestBody("text/plain".toMediaTypeOrNull())
                 val langBody = language.toRequestBody("text/plain".toMediaTypeOrNull())
-                ApiClient.api.uploadReel(videoPart, titleBody, langBody)
+                val tagsBody = tags.toRequestBody("text/plain".toMediaTypeOrNull())
+                val ownerBody = UserSession.userId.toRequestBody("text/plain".toMediaTypeOrNull())
+                ApiClient.api.uploadReel(videoPart, titleBody, langBody, tagsBody, ownerBody)
                 _uploadState.value = UploadState.Success
             } catch (e: Exception) {
                 _uploadState.value = UploadState.Error(e.message ?: "Upload failed")
@@ -128,6 +131,7 @@ fun CreateReelScreen(
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var title by remember { mutableStateOf("") }
     var selectedLanguage by remember { mutableStateOf("EN") }
+    var tags by remember { mutableStateOf("") }
     var languageMenuExpanded by remember { mutableStateOf(false) }
 
     val videoPicker = rememberLauncherForActivityResult(
@@ -252,13 +256,29 @@ fun CreateReelScreen(
                 }
             }
 
+            // Tags
+            OutlinedTextField(
+                value = tags,
+                onValueChange = { tags = it },
+                label = { Text("Tagi (np. sport,jedzenie,podróże)") },
+                placeholder = { Text("#sport #jedzenie", color = ReelangTextSecondary) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = ReelangRed,
+                    focusedLabelColor = ReelangRed,
+                    unfocusedBorderColor = ReelangBorder
+                )
+            )
+
             // Upload button
             Button(
                 onClick = {
                     val uri = selectedUri ?: return@Button
                     if (title.isBlank()) return@Button
                     val videoFile = copyUriToTempFile(context, uri) ?: return@Button
-                    viewModel.uploadReel(videoFile, title, selectedLanguage)
+                    viewModel.uploadReel(videoFile, title, selectedLanguage, tags)
                 },
                 enabled = selectedUri != null &&
                         title.isNotBlank() &&

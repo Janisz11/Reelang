@@ -1,5 +1,6 @@
 package com.example.reelang.ui.profile
 
+import android.util.Log
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -35,6 +36,7 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -43,23 +45,44 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.reelang.auth.UserSession
+import com.example.reelang.network.ApiClient
+import com.example.reelang.network.models.ActivityStatsResponse
+import com.example.reelang.network.models.ProfileResponse
+import com.example.reelang.network.models.ReelResponse
+import com.example.reelang.ui.feed.bgColorsFor
+import com.example.reelang.ui.feed.sceneEmojiFor
 import com.example.reelang.ui.onboarding.ReelangBorder
 import com.example.reelang.ui.onboarding.ReelangCream
 import com.example.reelang.ui.onboarding.ReelangRed
 import com.example.reelang.ui.onboarding.ReelangSurface
 import com.example.reelang.ui.onboarding.ReelangTextPrimary
 import com.example.reelang.ui.onboarding.ReelangTextSecondary
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
-data class PostThumbnail(val id: String, val color: Color, val emoji: String)
+data class PostThumbnail(
+    val id: String,
+    val color: Color,
+    val emoji: String,
+    val thumbnailUrl: String? = null,
+    val reelId: String? = null
+)
 
 data class DayStat(val day: String, val value: Float)
 
@@ -68,18 +91,6 @@ data class LanguageStat(
     val name: String,
     val progress: Float,
     val percent: Int
-)
-
-data class ProfileData(
-    val name: String,
-    val subtitle: String,
-    val avatarInitials: String,
-    val avatarColor: Color,
-    val followers: String,
-    val following: String,
-    val likes: String,
-    val posts: List<PostThumbnail>,
-    val savedPosts: List<PostThumbnail>
 )
 
 data class WeeklyStats(
@@ -94,50 +105,88 @@ data class WeeklyStats(
 
 class ProfileViewModel : ViewModel() {
 
-    val profile = ProfileData(
-        name = "Alex Rivera",
-        subtitle = "POLYGLOT EXPLORER • LVL 24",
-        avatarInitials = "AR",
-        avatarColor = ReelangRed,
-        followers = "1.4k",
-        following = "312",
-        likes = "8.7k",
-        posts = listOf(
-            PostThumbnail("p1", Color(0xFF6A5ACD), "🎬"),
-            PostThumbnail("p2", Color(0xFF2E8B57), "🌍"),
-            PostThumbnail("p3", Color(0xFFDC143C), "🗼"),
-            PostThumbnail("p4", Color(0xFF4682B4), "🎵"),
-            PostThumbnail("p5", Color(0xFF8B4513), "☕"),
-            PostThumbnail("p6", Color(0xFF708090), "🏔️"),
+    private val _profile = MutableStateFlow<ProfileResponse?>(null)
+    val profile: StateFlow<ProfileResponse?> = _profile.asStateFlow()
+
+    private val _stats = MutableStateFlow<ActivityStatsResponse?>(null)
+    val stats: StateFlow<ActivityStatsResponse?> = _stats.asStateFlow()
+
+    private val _userReels = MutableStateFlow<List<ReelResponse>>(emptyList())
+    val userReels: StateFlow<List<ReelResponse>> = _userReels.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val statsFallback = WeeklyStats(
+        vocabularyMastered = "0",
+        streakDays = 0,
+        hoursWatched = 0,
+        weeklyActivity = listOf(
+            DayStat("Mon", 0f), DayStat("Tue", 0f), DayStat("Wed", 0f),
+            DayStat("Thu", 0f), DayStat("Fri", 0f), DayStat("Sat", 0f), DayStat("Sun", 0f)
         ),
-        savedPosts = listOf(
-            PostThumbnail("s1", Color(0xFFFF6347), "🍜"),
-            PostThumbnail("s2", Color(0xFF20B2AA), "🌊"),
-            PostThumbnail("s3", Color(0xFF9370DB), "🌸"),
-            PostThumbnail("s4", Color(0xFF3CB371), "🌿"),
-        )
+        targetLanguages = emptyList()
     )
 
-    val stats = WeeklyStats(
-        vocabularyMastered = "1.2k",
-        streakDays = 14,
-        hoursWatched = 156,
-        weeklyActivity = listOf(
-            DayStat("Mon", 0.40f),
-            DayStat("Tue", 0.70f),
-            DayStat("Wed", 0.50f),
-            DayStat("Thu", 0.90f),
-            DayStat("Fri", 0.60f),
-            DayStat("Sat", 1.00f),
-            DayStat("Sun", 0.30f),
-        ),
-        targetLanguages = listOf(
-            LanguageStat("🇫🇷", "French",   0.78f, 78),
-            LanguageStat("🇯🇵", "Japanese", 0.45f, 45),
-            LanguageStat("🇪🇸", "Spanish",  0.62f, 62),
-            LanguageStat("🇩🇪", "German",   0.23f, 23),
-        )
-    )
+    val statsComputed: WeeklyStats
+        get() {
+            val s = _stats.value ?: return statsFallback
+            return WeeklyStats(
+                vocabularyMastered = if (s.vocabularyMastered >= 1000)
+                    "${s.vocabularyMastered / 1000}.${(s.vocabularyMastered % 1000) / 100}k"
+                else s.vocabularyMastered.toString(),
+                streakDays = s.streakDays,
+                hoursWatched = s.hoursWatched.toInt(),
+                weeklyActivity = s.weeklyActivity.map { DayStat(it.day, it.value) },
+                targetLanguages = s.targetLanguages.map {
+                    LanguageStat(it.flag, it.name, it.progress, it.percent)
+                }
+            )
+        }
+
+    init {
+        loadProfile()
+        loadStats()
+        loadUserReels()
+    }
+
+    fun loadProfile() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            runCatching {
+                ApiClient.api.getMyProfile(UserSession.userId)
+            }.onSuccess {
+                _profile.value = it
+            }.onFailure {
+                Log.e("ProfileViewModel", "Failed to load profile", it)
+            }
+            _isLoading.value = false
+        }
+    }
+
+    fun loadStats() {
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.getMyStats(UserSession.userId)
+            }.onSuccess {
+                _stats.value = it
+            }.onFailure {
+                Log.e("ProfileViewModel", "Failed to load stats", it)
+            }
+        }
+    }
+
+    fun loadUserReels() {
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.getUserReels(UserSession.userId)
+            }.onSuccess {
+                _userReels.value = it
+            }.onFailure {
+                Log.e("ProfileViewModel", "Failed to load user reels", it)
+            }
+        }
+    }
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -151,9 +200,22 @@ fun ProfileScreen(
     onNavigateToStats: () -> Unit = {},
     viewModel: ProfileViewModel = viewModel()
 ) {
-    val profile = viewModel.profile
+    val profile by viewModel.profile.collectAsState()
+    val userReels by viewModel.userReels.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
-    val gridItems = if (selectedTab == 0) profile.posts else profile.savedPosts
+
+    val postsGrid = userReels.map { reel ->
+        PostThumbnail(
+            id = reel.id,
+            color = bgColorsFor(reel.language).first(),
+            emoji = sceneEmojiFor(reel.language),
+            thumbnailUrl = if (reel.thumbnailUrl != null)
+                "${ApiClient.BASE_URL}reels/${reel.id}/thumbnail"
+            else null,
+            reelId = reel.id
+        )
+    }
+    val gridItems = if (selectedTab == 0) postsGrid else emptyList()
 
     Scaffold(
         modifier = modifier,
@@ -190,24 +252,29 @@ fun ProfileScreen(
                 .padding(innerPadding),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
-            // ── Header ──────────────────────────────────────────────────────
             item {
-                ProfileHeader(profile = profile)
+                ProfileHeader(
+                    name = profile?.username ?: UserSession.displayName,
+                    subtitle = "LVL ${profile?.level ?: 1}",
+                    avatarInitials = profile?.avatarInitials ?: UserSession.initials(),
+                    avatarColor = ReelangRed
+                )
             }
 
-            // ── Stats Row ───────────────────────────────────────────────────
             item {
-                StatsRow(profile = profile)
+                StatsRow(
+                    followers = profile?.followersCount?.toString() ?: "0",
+                    following = profile?.followingCount?.toString() ?: "0",
+                    likes = profile?.totalLikes?.toString() ?: "0"
+                )
                 HorizontalDivider(color = ReelangBorder, thickness = 1.dp)
             }
 
-            // ── Learning Stats Card ──────────────────────────────────────────
             item {
                 LearningStatsCard(onClick = onNavigateToStats)
                 Spacer(Modifier.height(2.dp))
             }
 
-            // ── Tab Row ─────────────────────────────────────────────────────
             item {
                 ProfileTabRow(
                     selectedTab = selectedTab,
@@ -215,9 +282,15 @@ fun ProfileScreen(
                 )
             }
 
-            // ── Thumbnail Grid ───────────────────────────────────────────────
             item {
-                ThumbnailGrid(items = gridItems)
+                ThumbnailGrid(
+                    items = gridItems,
+                    onReelClick = { reelId ->
+                        val allIds = gridItems.mapNotNull { it.reelId }
+                        val orderedIds = listOf(reelId) + allIds.filter { it != reelId }
+                        navController.navigate("feed_from_search/${orderedIds.joinToString(",")}")
+                    }
+                )
             }
         }
     }
@@ -226,7 +299,12 @@ fun ProfileScreen(
 // ─── Header ───────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ProfileHeader(profile: ProfileData) {
+private fun ProfileHeader(
+    name: String,
+    subtitle: String,
+    avatarInitials: String,
+    avatarColor: Color
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -234,16 +312,15 @@ private fun ProfileHeader(profile: ProfileData) {
             .padding(horizontal = 20.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Avatar
         Box(
             modifier = Modifier
                 .size(88.dp)
                 .clip(CircleShape)
-                .background(profile.avatarColor),
+                .background(avatarColor),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = profile.avatarInitials,
+                text = avatarInitials,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White
@@ -251,14 +328,14 @@ private fun ProfileHeader(profile: ProfileData) {
         }
         Spacer(Modifier.height(14.dp))
         Text(
-            text = profile.name,
+            text = name,
             fontSize = 20.sp,
             fontWeight = FontWeight.ExtraBold,
             color = ReelangTextPrimary
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = profile.subtitle,
+            text = subtitle,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             color = ReelangTextSecondary,
@@ -270,7 +347,7 @@ private fun ProfileHeader(profile: ProfileData) {
 // ─── Stats Row ────────────────────────────────────────────────────────────────
 
 @Composable
-private fun StatsRow(profile: ProfileData) {
+private fun StatsRow(followers: String, following: String, likes: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -278,11 +355,11 @@ private fun StatsRow(profile: ProfileData) {
             .padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        StatCell(value = profile.followers, label = "Followers")
+        StatCell(value = followers, label = "Followers")
         StatDivider()
-        StatCell(value = profile.following, label = "Following")
+        StatCell(value = following, label = "Following")
         StatDivider()
-        StatCell(value = profile.likes, label = "Likes")
+        StatCell(value = likes, label = "Likes")
     }
 }
 
@@ -411,7 +488,10 @@ private fun ProfileTabRow(selectedTab: Int, onTabSelected: (Int) -> Unit) {
 // ─── Thumbnail Grid ───────────────────────────────────────────────────────────
 
 @Composable
-private fun ThumbnailGrid(items: List<PostThumbnail>) {
+private fun ThumbnailGrid(
+    items: List<PostThumbnail>,
+    onReelClick: (String) -> Unit = {}
+) {
     val rows = items.chunked(3)
     Column(modifier = Modifier.fillMaxWidth()) {
         rows.forEach { row ->
@@ -422,6 +502,7 @@ private fun ThumbnailGrid(items: List<PostThumbnail>) {
                 row.forEach { thumb ->
                     ThumbnailCell(
                         thumb = thumb,
+                        onClick = { onReelClick(thumb.reelId ?: thumb.id) },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -435,17 +516,32 @@ private fun ThumbnailGrid(items: List<PostThumbnail>) {
 }
 
 @Composable
-private fun ThumbnailCell(thumb: PostThumbnail, modifier: Modifier = Modifier) {
+private fun ThumbnailCell(
+    thumb: PostThumbnail,
+    onClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .background(thumb.color),
+            .background(thumb.color)
+            .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = thumb.emoji,
-            fontSize = 30.sp,
-            textAlign = TextAlign.Center
-        )
+        if (thumb.thumbnailUrl != null) {
+            AsyncImage(
+                model = thumb.thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                error = painterResource(android.R.drawable.ic_menu_gallery)
+            )
+        } else {
+            Text(
+                text = thumb.emoji,
+                fontSize = 30.sp,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }

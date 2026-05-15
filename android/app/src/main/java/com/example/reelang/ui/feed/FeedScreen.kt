@@ -101,7 +101,7 @@ private fun levelColor(level: String) = when (level) {
     else        -> Color(0xFF757575)
 }
 
-private fun bgColorsFor(language: String): List<Color> = when (language.lowercase()) {
+internal fun bgColorsFor(language: String): List<Color> = when (language.lowercase()) {
     "es" -> listOf(Color(0xFF1A1A2E), Color(0xFF16213E))
     "fr" -> listOf(Color(0xFF2D1B1B), Color(0xFF4A1A00))
     "ja" -> listOf(Color(0xFF0D1B2A), Color(0xFF1B263B))
@@ -110,7 +110,7 @@ private fun bgColorsFor(language: String): List<Color> = when (language.lowercas
     else -> listOf(Color(0xFF1A1A1A), Color(0xFF2D2D2D))
 }
 
-private fun sceneEmojiFor(language: String): String = when (language.lowercase()) {
+internal fun sceneEmojiFor(language: String): String = when (language.lowercase()) {
     "es" -> "☀️"
     "fr" -> "🥐"
     "ja" -> "🚉"

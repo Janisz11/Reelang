@@ -41,7 +41,8 @@ import com.example.reelang.ui.onboarding.ReelangRed
 fun ReelsScreen(
     viewModel: FeedViewModel = viewModel(),
     bottomPadding: Dp = 0.dp,
-    onWordClick: (String) -> Unit = {}
+    onWordClick: (String) -> Unit = {},
+    priorityReelIds: List<String> = emptyList()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -81,19 +82,28 @@ fun ReelsScreen(
 
             is UiState.Success -> {
                 val reels = state.data
-                if (reels.isNotEmpty()) {
-                    val pagerState = rememberPagerState { reels.size }
+                val sortedReels = if (priorityReelIds.isEmpty()) {
+                    reels
+                } else {
+                    val prioritySet = priorityReelIds.toSet()
+                    val priority = reels.filter { it.id in prioritySet }
+                        .sortedBy { priorityReelIds.indexOf(it.id) }
+                    val rest = reels.filter { it.id !in prioritySet }
+                    priority + rest
+                }
+                if (sortedReels.isNotEmpty()) {
+                    val pagerState = rememberPagerState { sortedReels.size }
                     val captionsMap by viewModel.captionsMap.collectAsState()
 
                     LaunchedEffect(pagerState.settledPage) {
-                        viewModel.loadCaptions(reels[pagerState.settledPage].id)
+                        viewModel.loadCaptions(sortedReels[pagerState.settledPage].id)
                     }
 
                     VerticalPager(
                         state = pagerState,
                         modifier = Modifier.fillMaxSize()
                     ) { page ->
-                        val reel = reels[page]
+                        val reel = sortedReels[page]
                         ReelCard(
                             reel = reel,
                             captions = captionsMap[reel.id] ?: emptyList(),

@@ -17,5 +17,6 @@ data class ReelResponse(
     @SerializedName("youtube_id")      val youtubeId: String?     = null,
     @SerializedName("title")           val title: String?         = null,
     @SerializedName("thumbnail_url")   val thumbnailUrl: String?  = null,
-    @SerializedName("duration_ms")     val durationMs: Int?       = null
+    @SerializedName("duration_ms")     val durationMs: Int?       = null,
+    @SerializedName("tags")             val tags: String?          = null
 )

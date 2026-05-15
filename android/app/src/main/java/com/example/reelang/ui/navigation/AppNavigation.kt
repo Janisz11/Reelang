@@ -42,6 +42,7 @@ import com.example.reelang.auth.AuthScreen
 import com.example.reelang.auth.AuthViewModel
 import com.example.reelang.ui.create.CreateReelScreen
 import com.example.reelang.ui.onboarding.OnboardingScreen
+import com.example.reelang.ui.search.SearchScreen
 import com.example.reelang.ui.reels.ReelsScreen
 import com.example.reelang.ui.profile.ProfileScreen
 import com.example.reelang.ui.profile.StatsScreen
@@ -137,7 +138,10 @@ fun AppNavigation(
             }
 
             composable("search") {
-                PlaceholderScreen("Search", Modifier.padding(innerPadding))
+                SearchScreen(
+                    navController = navController,
+                    modifier = Modifier.padding(innerPadding)
+                )
             }
 
             composable("words") {
@@ -165,6 +169,23 @@ fun AppNavigation(
 
             composable("stats") {
                 StatsScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable("profile/{userId}") {
+                ProfileScreen(
+                    navController = navController,
+                    modifier = Modifier.padding(innerPadding),
+                    onNavigateToStats = { navController.navigate("stats") }
+                )
+            }
+
+            composable("feed_from_search/{reelIds}") { backStack ->
+                val reelIds = backStack.arguments?.getString("reelIds") ?: ""
+                ReelsScreen(
+                    bottomPadding = innerPadding.calculateBottomPadding(),
+                    onWordClick = { wordId -> navController.toWordDetail(wordId) },
+                    priorityReelIds = reelIds.split(",").filter { it.isNotEmpty() }
+                )
             }
 
             composable("create_reel") {

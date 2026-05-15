@@ -54,7 +54,7 @@ fun StatsScreen(
     onBack: () -> Unit,
     viewModel: ProfileViewModel = viewModel()
 ) {
-    val stats = viewModel.stats
+    val stats = viewModel.statsComputed
 
     Scaffold(
         containerColor = ReelangCream,
