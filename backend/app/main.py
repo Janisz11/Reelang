@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import Base
-from .routers import admin, reels, words, search, profiles, activity
+from .routers import admin, reels, words, search, profiles, activity, feed
 
 app = FastAPI(
     title="ReeLang API",
@@ -26,6 +26,7 @@ app.include_router(words.router, prefix="/api/v1")
 app.include_router(search.router, prefix="/api/v1")
 app.include_router(profiles.router, prefix="/api/v1")
 app.include_router(activity.router, prefix="/api/v1")
+app.include_router(feed.router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["health"])

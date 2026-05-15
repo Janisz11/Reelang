@@ -27,7 +27,6 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-reelang}:${POSTGRES_PASSWORD:-reelang}@postgres:5432/${POSTGRES_DB:-reelang}
       GROQ_API_KEY: ${GROQ_API_KEY}
-
     ports:
       - "8000:8000"
     volumes:
@@ -35,6 +34,28 @@ services:
       - video_cache:/tmp/reels
     command: >
       sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  reelang_ai:
+    build: ../reelang_ai
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-reelang}:${POSTGRES_PASSWORD:-reelang}@postgres:5432/${POSTGRES_DB:-reelang}
+      BACKEND_URL: http://api:8000
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
+      SCHEDULER_INTERVAL_MINUTES: 30
+      QUEUE_MIN_SIZE: 5
+      REELS_PER_RUN: 5
 
 volumes:
   postgres_data:
