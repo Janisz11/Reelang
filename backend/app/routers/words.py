@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -15,11 +17,37 @@ router = APIRouter(prefix="/words", tags=["words"])
 HARDCODED_USER_ID = "default_user"
 
 
+
+
+class ReviewRequest(BaseModel):
+    quality: int  # 0-5: 0-2=fail, 3-5=pass
+
+
+def sm2_update(
+    repetitions: int, easiness: float, interval_days: int, quality: int
+) -> tuple[int, float, int]:
+    if quality >= 3:
+        if repetitions == 0:
+            new_interval = 1
+        elif repetitions == 1:
+            new_interval = 6
+        else:
+            new_interval = round(interval_days * easiness)
+        new_repetitions = repetitions + 1
+    else:
+        new_interval = 1
+        new_repetitions = 0
+
+    new_easiness = easiness + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
+    new_easiness = max(1.3, new_easiness)
+
+    return new_repetitions, new_easiness, new_interval
+
+
 # ── POST /words ───────────────────────────────────────────────────────────────
 
 @router.post("", response_model=WordResponse, status_code=201)
 def add_word(payload: WordCreateRequest, db: Session = Depends(get_db)):
-    # Check for duplicate per user + term + language
     existing = (
         db.query(Word)
         .filter(
@@ -82,13 +110,20 @@ def lookup_word(
 # ── GET /words ────────────────────────────────────────────────────────────────
 
 @router.get("", response_model=List[WordResponse])
-def list_words(db: Session = Depends(get_db)):
-    return (
-        db.query(Word)
-        .filter(Word.user_id == HARDCODED_USER_ID)
-        .order_by(Word.created_at.desc())
-        .all()
-    )
+def list_words(
+    due_only: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    q = db.query(Word).filter(Word.user_id == HARDCODED_USER_ID)
+    if due_only:
+        q = q.filter(
+            (Word.next_review == None) |  # noqa: E711
+            (Word.next_review <= datetime.utcnow())
+        )
+    return q.order_by(
+        Word.next_review.asc().nullsfirst(),
+        Word.created_at.desc(),
+    ).all()
 
 
 # ── GET /words/{word_id} ──────────────────────────────────────────────────────
@@ -98,4 +133,34 @@ def get_word(word_id: str, db: Session = Depends(get_db)):
     word = db.query(Word).filter(Word.id == word_id).first()
     if not word:
         raise HTTPException(status_code=404, detail="Word not found")
+    return word
+
+
+# ── POST /words/{word_id}/review ──────────────────────────────────────────────
+
+@router.post("/{word_id}/review", response_model=WordResponse)
+def review_word(
+    word_id: str,
+    payload: ReviewRequest,
+    db: Session = Depends(get_db),
+):
+    word = db.query(Word).filter(Word.id == word_id).first()
+    if not word:
+        raise HTTPException(status_code=404, detail="Word not found")
+
+    new_reps, new_ease, new_interval = sm2_update(
+        word.repetitions,
+        word.easiness,
+        word.interval_days,
+        payload.quality,
+    )
+
+    word.repetitions = new_reps
+    word.easiness = new_ease
+    word.interval_days = new_interval
+    word.next_review = datetime.utcnow() + timedelta(days=new_interval)
+    word.status = "mastered" if new_reps >= 3 else "learning"
+
+    db.commit()
+    db.refresh(word)
     return word

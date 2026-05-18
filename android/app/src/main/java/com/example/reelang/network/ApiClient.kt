@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit
 
 object ApiClient {
 
-    const val BASE_URL = "https://bikes-routines-tank-recruiting.trycloudflare.com/api/v1/"
+    const val BASE_URL = "https://tray-individuals-psychological-assumes.trycloudflare.com/api/v1/"
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
@@ -30,3 +30,4 @@ object ApiClient {
 
     val api: ReelangApi = retrofit.create(ReelangApi::class.java)
 }
+

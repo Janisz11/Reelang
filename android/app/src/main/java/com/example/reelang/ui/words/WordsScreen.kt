@@ -57,11 +57,13 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.reelang.network.ApiClient
 import com.example.reelang.network.models.WordResponse
+import com.example.reelang.ui.common.LocalTTS
 import com.example.reelang.ui.common.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import androidx.navigation.NavController
 import com.example.reelang.ui.onboarding.ReelangBorder
 import com.example.reelang.ui.onboarding.ReelangCream
 import com.example.reelang.ui.onboarding.ReelangRed
@@ -112,7 +114,10 @@ class WordsViewModel : ViewModel() {
         id = id,
         term = term,
         definition = definition ?: "",
-        status = if (status?.uppercase() == "MASTERED") WordStatus.MASTERED else WordStatus.LEARNING,
+        status = when (status?.lowercase()) {
+            "mastered" -> WordStatus.MASTERED
+            else -> WordStatus.LEARNING
+        },
         progress = progress ?: 0f,
         language = language
     )
@@ -126,7 +131,8 @@ private val tabs = listOf("All", "Learning", "Mastered")
 fun WordsScreen(
     modifier: Modifier = Modifier,
     viewModel: WordsViewModel = viewModel(),
-    onWordClick: (wordId: String) -> Unit = {}
+    onWordClick: (wordId: String) -> Unit = {},
+    navController: NavController
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -267,7 +273,7 @@ fun WordsScreen(
                 Text("Export List", fontWeight = FontWeight.SemiBold)
             }
             Button(
-                onClick = { /* TODO: practice */ },
+                onClick = { navController.navigate("practice") },
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = ReelangRed,
@@ -303,6 +309,7 @@ private fun StreakBadge() {
 
 @Composable
 private fun WordCard(word: Word, onClick: () -> Unit) {
+    val tts = LocalTTS.current
     val progressColor = if (word.status == WordStatus.MASTERED) Color(0xFF4CAF50) else ReelangRed
 
     Surface(
@@ -345,7 +352,7 @@ private fun WordCard(word: Word, onClick: () -> Unit) {
             }
             Spacer(Modifier.width(12.dp))
             IconButton(
-                onClick = { /* TODO: pronounce */ },
+                onClick = { tts?.speak(word.term, word.language) },
                 modifier = Modifier
                     .size(38.dp)
                     .background(ReelangCream, CircleShape)

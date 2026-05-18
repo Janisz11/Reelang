@@ -6,17 +6,7 @@ import kotlinx.coroutines.tasks.await
 import okhttp3.Interceptor
 import okhttp3.Response
 
-/**
- * OkHttp interceptor that stamps every request with the Firebase user's identity:
- *   X-User-Id: <uid>
- *   Authorization: Bearer <idToken>
- *
- * The ID token is fetched synchronously via [runBlocking] — safe here because
- * OkHttp dispatches interceptors on its own background thread pool.
- * Firebase caches the token locally and only hits the network when it has expired.
- *
- * If no user is signed in, the headers are omitted and the request proceeds normally.
- */
+
 class AuthInterceptor : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {

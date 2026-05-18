@@ -86,6 +86,10 @@ class WordResponse(BaseModel):
     reel_id: Optional[str]
     segment_id: Optional[str]
     created_at: datetime
+    repetitions: int = 0
+    easiness: float = 2.5
+    interval_days: int = 1
+    next_review: Optional[datetime] = None
 
     class Config:
         from_attributes = True

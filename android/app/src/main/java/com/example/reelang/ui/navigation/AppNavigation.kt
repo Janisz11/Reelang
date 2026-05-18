@@ -50,6 +50,7 @@ import com.example.reelang.ui.reels.ReelsScreen
 import com.example.reelang.ui.profile.ProfileScreen
 import com.example.reelang.ui.profile.ProfileViewModel
 import com.example.reelang.ui.profile.StatsScreen
+import com.example.reelang.ui.words.PracticeScreen
 import com.example.reelang.ui.words.WordDetailScreen
 import com.example.reelang.ui.words.WordsScreen
 import com.example.reelang.ui.onboarding.ReelangCream
@@ -153,7 +154,14 @@ fun AppNavigation(
             composable("words") {
                 WordsScreen(
                     modifier = Modifier.padding(innerPadding),
-                    onWordClick = { wordId -> navController.toWordDetail(wordId) }
+                    onWordClick = { wordId -> navController.toWordDetail(wordId) },
+                    navController = navController
+                )
+            }
+
+            composable("practice") {
+                PracticeScreen(
+                    onBack = { navController.popBackStack() }
                 )
             }
 

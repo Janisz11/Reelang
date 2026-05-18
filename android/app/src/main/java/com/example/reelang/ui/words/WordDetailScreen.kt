@@ -48,6 +48,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.reelang.network.ApiClient
 import com.example.reelang.network.models.WordResponse
+import com.example.reelang.ui.common.LocalTTS
 import com.example.reelang.ui.common.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -286,6 +287,7 @@ private fun PartOfSpeechBadge(label: String) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HeroSection(detail: WordDetail) {
+    val tts = LocalTTS.current
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = ReelangSurface,
@@ -304,7 +306,7 @@ private fun HeroSection(detail: WordDetail) {
                     color = ReelangTextPrimary
                 )
                 IconButton(
-                    onClick = { /* TODO: play pronunciation */ },
+                    onClick = { tts?.speak(detail.term, detail.language) },
                     modifier = Modifier
                         .size(44.dp)
                         .background(ReelangCream, RoundedCornerShape(12.dp))
@@ -384,7 +386,7 @@ private fun TranslationChip(translation: Translation) {
 // ─── Flashcard ────────────────────────────────────────────────────────────────
 
 @Composable
-private fun FlashcardSection(detail: WordDetail) {
+internal fun FlashcardSection(detail: WordDetail) {
     var isFlipped by remember { mutableStateOf(false) }
     val rotation by animateFloatAsState(
         targetValue = if (isFlipped) 180f else 0f,

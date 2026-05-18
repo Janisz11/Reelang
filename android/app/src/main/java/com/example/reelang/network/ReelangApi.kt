@@ -10,6 +10,7 @@ import com.example.reelang.network.models.SaveResponse
 import com.example.reelang.network.models.WordLookupResponse
 import com.example.reelang.network.models.ProfileUpdateRequest
 import com.example.reelang.network.models.ReelResponse
+import com.example.reelang.network.models.ReviewRequest
 import com.example.reelang.network.models.SaveWordRequest
 import com.example.reelang.network.models.WordResponse
 import okhttp3.MultipartBody
@@ -102,6 +103,12 @@ interface ReelangApi {
     @GET("words/{id}")
     suspend fun getWordById(
         @Path("id") wordId: String
+    ): WordResponse
+
+    @POST("words/{id}/review")
+    suspend fun reviewWord(
+        @Path("id") wordId: String,
+        @Body request: ReviewRequest
     ): WordResponse
 
     @GET("words/lookup")

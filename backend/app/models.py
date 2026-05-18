@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, date
-from sqlalchemy import Column, String, Integer, BigInteger, DateTime, Date, ForeignKey, Text, Enum
+from sqlalchemy import Column, String, Integer, BigInteger, DateTime, Date, ForeignKey, Text, Enum, Float
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -60,6 +60,10 @@ class Word(Base):
     reel_id = Column(String, ForeignKey("reels.id", ondelete="SET NULL"), nullable=True)
     segment_id = Column(String, ForeignKey("caption_segments.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    repetitions = Column(Integer, default=0, nullable=False)
+    easiness = Column(Float, default=2.5, nullable=False)
+    interval_days = Column(Integer, default=1, nullable=False)
+    next_review = Column(DateTime, nullable=True)
 
     reel = relationship("Reel", back_populates="words")
 
