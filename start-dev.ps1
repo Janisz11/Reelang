@@ -31,19 +31,14 @@ while ($null -eq $url -and $attempts -lt 40) {
 }
 
 if ($url) {
-    $content = Get-Content $apiClientPath -Raw
-    $newContent = $content -replace 'const val BASE_URL = "https://[^"]*"', "const val BASE_URL = `"$url/api/v1/`""
-    Set-Content $apiClientPath $newContent
-
     Write-Host ""
     Write-Host "=====================================" -ForegroundColor Green
     Write-Host "Tunnel URL: $url" -ForegroundColor Green
     Write-Host "API URL:    $url/api/v1/" -ForegroundColor Cyan
     Write-Host "=====================================" -ForegroundColor Green
-    Write-Host "ApiClient.kt updated!" -ForegroundColor Green
-    Write-Host "Rebuild Android app (Shift+F10)" -ForegroundColor Yellow
+    Write-Host "NOTE: ApiClient.kt uses static Railway URL — no update needed." -ForegroundColor Yellow
     $url + "/api/v1/" | Set-Clipboard
-    Write-Host "(URL copied to clipboard)" -ForegroundColor Green
+    Write-Host "(Tunnel URL copied to clipboard for reference)" -ForegroundColor Green
 } else {
     Write-Host "Failed to get tunnel URL - check cloudflared.log" -ForegroundColor Red
 }

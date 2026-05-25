@@ -224,9 +224,9 @@ def _download_video_file(youtube_url: str, video_path: Path) -> None:
     Download video to *video_path*, merging best video+audio streams into mp4.
 
     Attempt order:
-      1. bestvideo[ext=mp4]+bestaudio[ext=m4a]  – native mp4 streams, no re-encode
-      2. bestvideo+bestaudio                      – any streams, merge to mp4
-      3. bestvideo+bestaudio/best/bestvideo/best  – broadest fallback for Shorts
+      1. bestvideo[ext=mp4]+bestaudio[ext=m4a]   native mp4 streams, no re-encode
+      2. bestvideo+bestaudio                      any streams, merge to mp4
+      3. bestvideo+bestaudio/best/bestvideo/best   broadest fallback for Shorts
     """
     _FORMATS = [
         {
