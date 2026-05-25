@@ -11,6 +11,7 @@ class ReelImportRequest(BaseModel):
     language: str
     level: Optional[str] = None
     topic: Optional[str] = None
+    tags: Optional[str] = None
 
 
 class ReelImportResponse(BaseModel):

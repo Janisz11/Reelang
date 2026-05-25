@@ -27,6 +27,7 @@ async def import_reel_to_backend(reel_data: Dict) -> str | None:
                     "language": reel_data["language"],
                     "level": reel_data["level"],
                     "topic": reel_data.get("topic", "language_learning"),
+                    "tags": reel_data.get("tags"),
                 },
             )
             if resp.status_code in (200, 201):
@@ -74,12 +75,28 @@ async def curate_feed_for_user(user_id: str, db: Session, count: int = 5) -> int
     ).fetchall()
     exclude_ids = [r[0] for r in existing_yt_ids]
 
+    import random
+
+    use_tags = profile.get("top_tags", []) if random.random() < 0.7 else []
+
     candidates = await search_youtube_shorts(
         language=profile["primary_language"],
         level=profile["level"],
         max_results=count * 2,
         exclude_ids=exclude_ids,
+        tags=use_tags,
     )
+
+    if len(candidates) < count and use_tags:
+        logger.info(f"Not enough tagged results, retrying without tags")
+        extra = await search_youtube_shorts(
+            language=profile["primary_language"],
+            level=profile["level"],
+            max_results=count,
+            exclude_ids=exclude_ids + [c["youtube_id"] for c in candidates],
+            tags=[],
+        )
+        candidates += extra
 
     added = 0
     for candidate in candidates:

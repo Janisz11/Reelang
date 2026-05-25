@@ -129,14 +129,36 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
     private val _uiState = MutableStateFlow<UiState<List<ReelItem>>>(UiState.Loading)
     val uiState: StateFlow<UiState<List<ReelItem>>> = _uiState.asStateFlow()
 
-    // reelId → caption segments; populated lazily as pages are visited
     private val _captionsMap = MutableStateFlow<Map<String, List<CaptionSegment>>>(emptyMap())
     val captionsMap: StateFlow<Map<String, List<CaptionSegment>>> = _captionsMap.asStateFlow()
 
     private val _currentStreak = MutableStateFlow(0)
     val currentStreak: StateFlow<Int> = _currentStreak.asStateFlow()
 
+    private var currentUid: String? = null
+
+    private val authListener = com.google.firebase.auth.FirebaseAuth.AuthStateListener { fa ->
+        val newUid = fa.currentUser?.uid
+        if (newUid != null && newUid != currentUid) {
+            currentUid = newUid
+            _captionsMap.value = emptyMap()
+            _savedTerms.clear()
+            if (autoLoad) {
+                loadReels()
+                loadStreak()
+                triggerAgentRefill()
+            }
+        } else if (newUid == null) {
+            currentUid = null
+            _uiState.value = UiState.Loading
+            _captionsMap.value = emptyMap()
+            _savedTerms.clear()
+        }
+    }
+
     init {
+        currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+        com.google.firebase.auth.FirebaseAuth.getInstance().addAuthStateListener(authListener)
         if (autoLoad) {
             loadReels()
             loadStreak()
@@ -337,6 +359,10 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
                 )
             }
         }
+    }
+
+    override fun onCleared() {
+        com.google.firebase.auth.FirebaseAuth.getInstance().removeAuthStateListener(authListener)
     }
 
     private fun ReelResponse.toReelItem() = ReelItem(

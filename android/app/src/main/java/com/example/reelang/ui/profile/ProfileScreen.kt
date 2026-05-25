@@ -25,6 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -121,6 +123,8 @@ class ProfileViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private var currentUid: String? = null
+
     private val statsFallback = WeeklyStats(
         vocabularyMastered = "0",
         streakDays = 0,
@@ -150,7 +154,20 @@ class ProfileViewModel : ViewModel() {
             )
         }
 
+    private val authListener = com.google.firebase.auth.FirebaseAuth.AuthStateListener { fa ->
+        val newUid = fa.currentUser?.uid
+        if (newUid != null && newUid != currentUid) {
+            currentUid = newUid
+            clearAndReload()
+        } else if (newUid == null) {
+            currentUid = null
+            clearAll()
+        }
+    }
+
     init {
+        currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+        com.google.firebase.auth.FirebaseAuth.getInstance().addAuthStateListener(authListener)
         loadProfile()
         loadStats()
         loadUserReels()
@@ -163,6 +180,25 @@ class ProfileViewModel : ViewModel() {
                 }
             }
         }
+    }
+
+    private fun clearAll() {
+        _profile.value = null
+        _stats.value = null
+        _userReels.value = emptyList()
+        _savedReels.value = emptyList()
+    }
+
+    private fun clearAndReload() {
+        clearAll()
+        loadProfile()
+        loadStats()
+        loadUserReels()
+        loadSavedReels()
+    }
+
+    override fun onCleared() {
+        com.google.firebase.auth.FirebaseAuth.getInstance().removeAuthStateListener(authListener)
     }
 
     fun loadProfile() {
@@ -226,6 +262,7 @@ fun ProfileScreen(
     navController: NavController,
     modifier: Modifier = Modifier,
     onNavigateToStats: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     viewModel: ProfileViewModel = viewModel()
 ) {
     val profile by viewModel.profile.collectAsState()
@@ -301,7 +338,8 @@ fun ProfileScreen(
                     name = profile?.username ?: UserSession.displayName,
                     subtitle = "LVL ${profile?.level ?: 1}",
                     avatarInitials = profile?.avatarInitials ?: UserSession.initials(),
-                    avatarColor = ReelangRed
+                    avatarColor = ReelangRed,
+                    onNavigateToSettings = onNavigateToSettings
                 )
             }
 
@@ -351,44 +389,60 @@ private fun ProfileHeader(
     name: String,
     subtitle: String,
     avatarInitials: String,
-    avatarColor: Color
+    avatarColor: Color,
+    onNavigateToSettings: () -> Unit = {}
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(ReelangSurface)
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 20.dp, vertical = 24.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(88.dp)
-                .clip(CircleShape)
-                .background(avatarColor),
-            contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Box(
+                modifier = Modifier
+                    .size(88.dp)
+                    .clip(CircleShape)
+                    .background(avatarColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = avatarInitials,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
+            }
+            Spacer(Modifier.height(14.dp))
             Text(
-                text = avatarInitials,
-                fontSize = 28.sp,
+                text = name,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = Color.White
+                color = ReelangTextPrimary
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = subtitle,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = ReelangTextSecondary,
+                letterSpacing = 0.6.sp
             )
         }
-        Spacer(Modifier.height(14.dp))
-        Text(
-            text = name,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = ReelangTextPrimary
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = subtitle,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = ReelangTextSecondary,
-            letterSpacing = 0.6.sp
-        )
+        IconButton(
+            onClick = onNavigateToSettings,
+            modifier = Modifier.align(Alignment.TopEnd)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Settings,
+                contentDescription = "Settings",
+                tint = ReelangTextSecondary,
+                modifier = Modifier.size(22.dp)
+            )
+        }
     }
 }
 

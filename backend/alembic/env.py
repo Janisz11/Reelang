@@ -5,11 +5,11 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 
 from app.database import Base
-import app.models  # noqa: F401 — ensure models are registered
+import app.models  
 
 config = context.config
 
-# Override sqlalchemy.url from environment variable if set
+
 db_url = os.getenv("DATABASE_URL")
 if db_url:
     config.set_main_option("sqlalchemy.url", db_url)

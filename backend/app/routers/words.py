@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -13,10 +13,6 @@ from ..schemas import WordCreateRequest, WordResponse
 from ..services.dictionary_service import fetch_definition
 
 router = APIRouter(prefix="/words", tags=["words"])
-
-HARDCODED_USER_ID = "default_user"
-
-
 
 
 class ReviewRequest(BaseModel):
@@ -47,11 +43,15 @@ def sm2_update(
 # ── POST /words ───────────────────────────────────────────────────────────────
 
 @router.post("", response_model=WordResponse, status_code=201)
-def add_word(payload: WordCreateRequest, db: Session = Depends(get_db)):
+def add_word(
+    payload: WordCreateRequest,
+    db: Session = Depends(get_db),
+    x_user_id: str = Header(...),
+):
     existing = (
         db.query(Word)
         .filter(
-            Word.user_id == HARDCODED_USER_ID,
+            Word.user_id == x_user_id,
             Word.term == payload.term,
             Word.language == payload.language,
         )
@@ -63,7 +63,7 @@ def add_word(payload: WordCreateRequest, db: Session = Depends(get_db)):
     definition = fetch_definition(payload.term, payload.language)
 
     word = Word(
-        user_id=HARDCODED_USER_ID,
+        user_id=x_user_id,
         term=payload.term,
         definition=definition,
         language=payload.language,
@@ -113,8 +113,9 @@ def lookup_word(
 def list_words(
     due_only: bool = Query(False),
     db: Session = Depends(get_db),
+    x_user_id: str = Header(...),
 ):
-    q = db.query(Word).filter(Word.user_id == HARDCODED_USER_ID)
+    q = db.query(Word).filter(Word.user_id == x_user_id)
     if due_only:
         q = q.filter(
             (Word.next_review == None) |  # noqa: E711
@@ -129,8 +130,16 @@ def list_words(
 # ── GET /words/{word_id} ──────────────────────────────────────────────────────
 
 @router.get("/{word_id}", response_model=WordResponse)
-def get_word(word_id: str, db: Session = Depends(get_db)):
-    word = db.query(Word).filter(Word.id == word_id).first()
+def get_word(
+    word_id: str,
+    db: Session = Depends(get_db),
+    x_user_id: str = Header(...),
+):
+    word = (
+        db.query(Word)
+        .filter(Word.id == word_id, Word.user_id == x_user_id)
+        .first()
+    )
     if not word:
         raise HTTPException(status_code=404, detail="Word not found")
     return word
@@ -143,8 +152,13 @@ def review_word(
     word_id: str,
     payload: ReviewRequest,
     db: Session = Depends(get_db),
+    x_user_id: str = Header(...),
 ):
-    word = db.query(Word).filter(Word.id == word_id).first()
+    word = (
+        db.query(Word)
+        .filter(Word.id == word_id, Word.user_id == x_user_id)
+        .first()
+    )
     if not word:
         raise HTTPException(status_code=404, detail="Word not found")
 

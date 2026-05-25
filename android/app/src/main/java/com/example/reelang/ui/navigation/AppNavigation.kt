@@ -49,6 +49,7 @@ import com.example.reelang.ui.search.SearchScreen
 import com.example.reelang.ui.reels.ReelsScreen
 import com.example.reelang.ui.profile.ProfileScreen
 import com.example.reelang.ui.profile.ProfileViewModel
+import com.example.reelang.ui.profile.SettingsScreen
 import com.example.reelang.ui.profile.StatsScreen
 import com.example.reelang.ui.words.PracticeScreen
 import com.example.reelang.ui.words.WordDetailScreen
@@ -178,6 +179,7 @@ fun AppNavigation(
                     navController = navController,
                     modifier = Modifier.padding(innerPadding),
                     onNavigateToStats = { navController.navigate("stats") },
+                    onNavigateToSettings = { navController.navigate("settings") },
                     viewModel = profileViewModel
                 )
             }
@@ -186,6 +188,17 @@ fun AppNavigation(
                 StatsScreen(
                     onBack = { navController.popBackStack() },
                     viewModel = profileViewModel
+                )
+            }
+
+            composable("settings") {
+                SettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onLogout = {
+                        navController.navigate("auth") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
                 )
             }
 

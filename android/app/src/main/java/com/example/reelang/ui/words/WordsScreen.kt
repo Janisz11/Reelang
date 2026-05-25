@@ -91,11 +91,30 @@ class WordsViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<UiState<List<Word>>>(UiState.Loading)
     val uiState: StateFlow<UiState<List<Word>>> = _uiState.asStateFlow()
 
+    private var currentUid: String? = null
+
+    private val authListener = com.google.firebase.auth.FirebaseAuth.AuthStateListener { fa ->
+        val newUid = fa.currentUser?.uid
+        if (newUid != null && newUid != currentUid) {
+            currentUid = newUid
+            loadWords()
+        } else if (newUid == null) {
+            currentUid = null
+            _uiState.value = UiState.Loading
+        }
+    }
+
     init {
+        currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+        com.google.firebase.auth.FirebaseAuth.getInstance().addAuthStateListener(authListener)
         loadWords()
         viewModelScope.launch {
             WordsEventBus.wordSaved.collect { loadWords() }
         }
+    }
+
+    override fun onCleared() {
+        com.google.firebase.auth.FirebaseAuth.getInstance().removeAuthStateListener(authListener)
     }
 
     fun loadWords() {

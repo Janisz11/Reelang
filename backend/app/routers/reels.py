@@ -110,6 +110,7 @@ async def import_reel(
         language=payload.language.lower(),
         level=payload.level,
         topic=payload.topic,
+        tags=payload.tags,
     )
     db.add(reel)
     db.commit()
