@@ -52,16 +52,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.util.Log
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.reelang.data.local.entities.WordEntity
 import com.example.reelang.network.ApiClient
 import com.example.reelang.network.models.WordResponse
+import com.example.reelang.ui.common.LocalDbSource
 import com.example.reelang.ui.common.LocalTTS
 import com.example.reelang.ui.common.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import androidx.navigation.NavController
 import com.example.reelang.ui.onboarding.ReelangBorder
@@ -87,6 +92,12 @@ data class Word(
 // ─── ViewModel ────────────────────────────────────────────────────────────────
 
 class WordsViewModel : ViewModel() {
+
+    private var localDataSource: com.example.reelang.data.local.LocalDataSource? = null
+
+    fun setLocalDataSource(ds: com.example.reelang.data.local.LocalDataSource) {
+        localDataSource = ds
+    }
 
     private val _uiState = MutableStateFlow<UiState<List<Word>>>(UiState.Loading)
     val uiState: StateFlow<UiState<List<Word>>> = _uiState.asStateFlow()
@@ -123,8 +134,47 @@ class WordsViewModel : ViewModel() {
             try {
                 val words = ApiClient.api.getWords().map { it.toWord() }
                 _uiState.value = UiState.Success(words)
+                // Cache to Room
+                localDataSource?.let { ds ->
+                    val entities = words.map { word ->
+                        WordEntity(
+                            id = word.id,
+                            term = word.term,
+                            definition = word.definition,
+                            translation = null,
+                            language = word.language,
+                            status = word.status.name.lowercase(),
+                            reelId = null,
+                            createdAt = System.currentTimeMillis().toString()
+                        )
+                    }
+                    ds.saveWords(entities)
+                    Log.d("WordsViewModel", "Cached ${entities.size} words to Room")
+                }
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to load words")
+                Log.e("WordsViewModel", "loadWords failed - trying Room cache", e)
+                // Fallback to Room
+                localDataSource?.getAllWords()?.firstOrNull()?.let { cached ->
+                    if (cached.isNotEmpty()) {
+                        Log.d("WordsViewModel", "Loading ${cached.size} words from Room")
+                        val words = cached.map { entity ->
+                            Word(
+                                id = entity.id,
+                                term = entity.term,
+                                definition = entity.definition ?: "",
+                                status = if (entity.status == "mastered")
+                                    WordStatus.MASTERED else WordStatus.LEARNING,
+                                progress = 0f,
+                                language = entity.language
+                            )
+                        }
+                        _uiState.value = UiState.Success(words)
+                    } else {
+                        _uiState.value = UiState.Error("No internet connection")
+                    }
+                } ?: run {
+                    _uiState.value = UiState.Error("No internet connection")
+                }
             }
         }
     }
@@ -153,6 +203,11 @@ fun WordsScreen(
     onWordClick: (wordId: String) -> Unit = {},
     navController: NavController
 ) {
+    val localDbSource = LocalDbSource.current
+    LaunchedEffect(localDbSource) {
+        localDbSource?.let { viewModel.setLocalDataSource(it) }
+    }
+
     val uiState by viewModel.uiState.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
 

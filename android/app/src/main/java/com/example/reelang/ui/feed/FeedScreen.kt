@@ -61,12 +61,15 @@ import com.example.reelang.network.models.ReelResponse
 import com.example.reelang.network.models.SaveWordRequest
 import com.example.reelang.ui.words.WordsEventBus
 import com.example.reelang.ui.common.UiState
+import com.example.reelang.data.local.LocalDataSource
+import com.example.reelang.data.local.entities.ReelEntity
 import com.example.reelang.ui.SharedState
 import com.example.reelang.ui.onboarding.ReelangRed
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -126,6 +129,12 @@ internal fun sceneEmojiFor(language: String): String = when (language.lowercase(
 
 class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
 
+    private var localDataSource: LocalDataSource? = null
+
+    fun setLocalDataSource(ds: LocalDataSource) {
+        localDataSource = ds
+    }
+
     private val _uiState = MutableStateFlow<UiState<List<ReelItem>>>(UiState.Loading)
     val uiState: StateFlow<UiState<List<ReelItem>>> = _uiState.asStateFlow()
 
@@ -184,14 +193,43 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
         _uiState.value = UiState.Loading
         viewModelScope.launch {
             try {
-                val response = ApiClient.api.getFeed(userId = UserSession.userId)
+                val response = ApiClient.api.getFeed(userId = UserSession.userId, limit = 20)
                 Log.d("FeedViewModel", "Loaded ${response.size} reel(s): ${response.map { it.id }}")
                 Log.d("FeedViewModel", "youtubeIds: ${response.map { it.youtubeId }}")
                 val reels = response.map { it.toReelItem() }
                 _uiState.value = UiState.Success(reels)
+                // Cache in Room
+                localDataSource?.let { ds ->
+                    val entities = response.map { reel ->
+                        ReelEntity(
+                            id = reel.id,
+                            youtubeId = reel.youtubeId,
+                            title = reel.title ?: "",
+                            channelName = reel.channelName,
+                            thumbnailUrl = reel.thumbnailUrl,
+                            language = reel.language,
+                            level = reel.level,
+                            tags = reel.tags,
+                            durationMs = reel.durationMs,
+                            likesCount = reel.likesCount,
+                            isLiked = reel.isLiked
+                        )
+                    }
+                    ds.cacheReels(entities)
+                    Log.d("FeedViewModel", "Cached ${entities.size} reels to Room")
+                }
             } catch (e: Exception) {
                 Log.e("FeedViewModel", "loadReels failed", e)
-                _uiState.value = UiState.Error(e.message ?: "Failed to load reels")
+                // Try Room cache
+                val cached = localDataSource?.getCachedReels()?.firstOrNull()
+                if (!cached.isNullOrEmpty()) {
+                    Log.d("FeedViewModel", "Loading ${cached.size} reels from Room cache")
+                    val reels = cached.map { it.toReelItem() }
+                    _uiState.value = UiState.Success(reels)
+                } else {
+                    Log.d("FeedViewModel", "No cache available")
+                    _uiState.value = UiState.Error(e.message ?: "Failed to load reels")
+                }
             }
         }
     }
@@ -364,6 +402,24 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
     override fun onCleared() {
         com.google.firebase.auth.FirebaseAuth.getInstance().removeAuthStateListener(authListener)
     }
+
+    private fun ReelEntity.toReelItem() = ReelItem(
+        id = id,
+        channelName = channelName ?: "",
+        avatarEmoji = sceneEmojiFor(language),
+        originalText = "",
+        translatedText = "",
+        clickableWord = "",
+        likes = likesCount,
+        saves = 0,
+        level = level ?: "",
+        streakDays = 0,
+        language = language,
+        bgColors = bgColorsFor(language),
+        sceneEmoji = sceneEmojiFor(language),
+        youtubeId = youtubeId,
+        isLiked = isLiked
+    )
 
     private fun ReelResponse.toReelItem() = ReelItem(
         id = id,

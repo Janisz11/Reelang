@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.reelang.network.ApiClient
+import com.example.reelang.ui.common.LocalDbSource
 import com.example.reelang.ui.common.UiState
 import com.example.reelang.ui.feed.FeedViewModel
 import com.example.reelang.ui.feed.ReelActions
@@ -49,6 +50,10 @@ fun ReelsScreen(
     priorityReelIds: List<String> = emptyList()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val localDbSource = LocalDbSource.current
+    LaunchedEffect(localDbSource) {
+        localDbSource?.let { viewModel.setLocalDataSource(it) }
+    }
 
     Box(
         modifier = Modifier

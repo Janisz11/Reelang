@@ -38,6 +38,7 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -59,10 +60,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.reelang.auth.UserSession
+import com.example.reelang.data.local.entities.UserProfileEntity
 import com.example.reelang.network.ApiClient
 import com.example.reelang.network.models.ActivityStatsResponse
 import com.example.reelang.network.models.ProfileResponse
 import com.example.reelang.network.models.ReelResponse
+import com.example.reelang.ui.common.LocalDbSource
 import com.example.reelang.ui.feed.bgColorsFor
 import com.example.reelang.ui.feed.sceneEmojiFor
 import com.example.reelang.ui.SharedState
@@ -106,7 +109,13 @@ data class WeeklyStats(
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
 
-class ProfileViewModel : ViewModel() {
+class ProfileViewModel(private val initialTargetUserId: String? = null) : ViewModel() {
+
+    private var localDataSource: com.example.reelang.data.local.LocalDataSource? = null
+
+    fun setLocalDataSource(ds: com.example.reelang.data.local.LocalDataSource) {
+        localDataSource = ds
+    }
 
     private val _profile = MutableStateFlow<ProfileResponse?>(null)
     val profile: StateFlow<ProfileResponse?> = _profile.asStateFlow()
@@ -166,17 +175,21 @@ class ProfileViewModel : ViewModel() {
     }
 
     init {
-        currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
-        com.google.firebase.auth.FirebaseAuth.getInstance().addAuthStateListener(authListener)
-        loadProfile()
-        loadStats()
-        loadUserReels()
-        loadSavedReels()
-        viewModelScope.launch {
-            SharedState.profileRefreshTrigger.collect {
-                if (it > 0) {
-                    loadProfile()
-                    loadSavedReels()
+        if (initialTargetUserId != null) {
+            loadForUser(initialTargetUserId)
+        } else {
+            currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+            com.google.firebase.auth.FirebaseAuth.getInstance().addAuthStateListener(authListener)
+            loadProfile()
+            loadStats()
+            loadUserReels()
+            loadSavedReels()
+            viewModelScope.launch {
+                SharedState.profileRefreshTrigger.collect {
+                    if (it > 0) {
+                        loadProfile()
+                        loadSavedReels()
+                    }
                 }
             }
         }
@@ -198,7 +211,9 @@ class ProfileViewModel : ViewModel() {
     }
 
     override fun onCleared() {
-        com.google.firebase.auth.FirebaseAuth.getInstance().removeAuthStateListener(authListener)
+        if (initialTargetUserId == null) {
+            com.google.firebase.auth.FirebaseAuth.getInstance().removeAuthStateListener(authListener)
+        }
     }
 
     fun loadProfile() {
@@ -206,10 +221,38 @@ class ProfileViewModel : ViewModel() {
             _isLoading.value = true
             runCatching {
                 ApiClient.api.getMyProfile(UserSession.userId)
-            }.onSuccess {
-                _profile.value = it
+            }.onSuccess { profile ->
+                _profile.value = profile
+                // Cache to Room
+                localDataSource?.saveProfile(
+                    UserProfileEntity(
+                        userId = profile.userId,
+                        username = profile.username,
+                        avatarInitials = profile.avatarInitials,
+                        followersCount = profile.followersCount,
+                        followingCount = profile.followingCount,
+                        totalLikes = profile.totalLikes,
+                        level = profile.level,
+                        streakDays = profile.streakDays
+                    )
+                )
             }.onFailure {
-                Log.e("ProfileViewModel", "Failed to load profile", it)
+                Log.e("ProfileViewModel", "Failed to load profile - trying Room cache", it)
+                // Fallback to Room
+                localDataSource?.getProfile(UserSession.userId)?.let { cached ->
+                    _profile.value = ProfileResponse(
+                        userId = cached.userId,
+                        username = cached.username,
+                        bio = null,
+                        avatarInitials = cached.avatarInitials,
+                        followersCount = cached.followersCount,
+                        followingCount = cached.followingCount,
+                        totalLikes = cached.totalLikes,
+                        level = cached.level,
+                        streakDays = cached.streakDays,
+                        isFollowing = false
+                    )
+                }
             }
             _isLoading.value = false
         }
@@ -251,6 +294,31 @@ class ProfileViewModel : ViewModel() {
             }
         }
     }
+
+    fun loadForUser(targetUserId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            runCatching {
+                ApiClient.api.getProfile(targetUserId, UserSession.userId)
+            }.onSuccess { _profile.value = it }
+             .onFailure { Log.e("ProfileViewModel", "Failed to load profile for $targetUserId", it) }
+            _isLoading.value = false
+        }
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.getUserReels(targetUserId)
+            }.onSuccess { _userReels.value = it }
+             .onFailure { Log.e("ProfileViewModel", "Failed to load reels for $targetUserId", it) }
+        }
+        _savedReels.value = emptyList()
+        _stats.value = null
+    }
+}
+
+class ProfileViewModelFactory(private val targetUserId: String) : androidx.lifecycle.ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
+        ProfileViewModel(targetUserId) as T
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -263,11 +331,23 @@ fun ProfileScreen(
     modifier: Modifier = Modifier,
     onNavigateToStats: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
-    viewModel: ProfileViewModel = viewModel()
+    viewModel: ProfileViewModel? = null,
+    targetUserId: String? = null
 ) {
-    val profile by viewModel.profile.collectAsState()
-    val userReels by viewModel.userReels.collectAsState()
-    val savedReels by viewModel.savedReels.collectAsState()
+    val isOtherUser = targetUserId != null && targetUserId != UserSession.userId
+    val effectiveViewModel: ProfileViewModel = viewModel ?: if (isOtherUser) {
+        androidx.lifecycle.viewmodel.compose.viewModel(factory = ProfileViewModelFactory(targetUserId!!))
+    } else {
+        androidx.lifecycle.viewmodel.compose.viewModel()
+    }
+    val localDbSource = LocalDbSource.current
+    LaunchedEffect(localDbSource) {
+        localDbSource?.let { effectiveViewModel.setLocalDataSource(it) }
+    }
+
+    val profile by effectiveViewModel.profile.collectAsState()
+    val userReels by effectiveViewModel.userReels.collectAsState()
+    val savedReels by effectiveViewModel.savedReels.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val userReelThumbnails = userReels.map { reel ->
@@ -302,27 +382,29 @@ fun ProfileScreen(
         modifier = modifier,
         containerColor = ReelangCream,
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate("create_reel") },
-                containerColor = ReelangRed,
-                contentColor = Color.White,
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+            if (!isOtherUser) {
+                FloatingActionButton(
+                    onClick = { navController.navigate("create_reel") },
+                    containerColor = ReelangRed,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "Create",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "Create",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
             }
         }
@@ -339,7 +421,7 @@ fun ProfileScreen(
                     subtitle = "LVL ${profile?.level ?: 1}",
                     avatarInitials = profile?.avatarInitials ?: UserSession.initials(),
                     avatarColor = ReelangRed,
-                    onNavigateToSettings = onNavigateToSettings
+                    onNavigateToSettings = if (isOtherUser) null else onNavigateToSettings
                 )
             }
 
@@ -352,7 +434,7 @@ fun ProfileScreen(
                 HorizontalDivider(color = ReelangBorder, thickness = 1.dp)
             }
 
-            item {
+            if (!isOtherUser) item {
                 LearningStatsCard(onClick = onNavigateToStats)
                 Spacer(Modifier.height(2.dp))
             }
@@ -390,7 +472,7 @@ private fun ProfileHeader(
     subtitle: String,
     avatarInitials: String,
     avatarColor: Color,
-    onNavigateToSettings: () -> Unit = {}
+    onNavigateToSettings: (() -> Unit)? = {}
 ) {
     Box(
         modifier = Modifier
@@ -432,16 +514,18 @@ private fun ProfileHeader(
                 letterSpacing = 0.6.sp
             )
         }
-        IconButton(
-            onClick = onNavigateToSettings,
-            modifier = Modifier.align(Alignment.TopEnd)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Settings,
-                contentDescription = "Settings",
-                tint = ReelangTextSecondary,
-                modifier = Modifier.size(22.dp)
-            )
+        if (onNavigateToSettings != null) {
+            IconButton(
+                onClick = onNavigateToSettings,
+                modifier = Modifier.align(Alignment.TopEnd)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Settings,
+                    contentDescription = "Settings",
+                    tint = ReelangTextSecondary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
         }
     }
 }

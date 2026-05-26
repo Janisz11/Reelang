@@ -202,11 +202,13 @@ fun AppNavigation(
                 )
             }
 
-            composable("profile/{userId}") {
+            composable("profile/{userId}") { backStack ->
+                val userId = backStack.arguments?.getString("userId") ?: ""
                 ProfileScreen(
                     navController = navController,
                     modifier = Modifier.padding(innerPadding),
-                    onNavigateToStats = { navController.navigate("stats") }
+                    onNavigateToStats = { navController.navigate("stats") },
+                    targetUserId = userId
                 )
             }
 

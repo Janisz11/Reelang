@@ -22,8 +22,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.reelang.auth.UserSession
+import com.example.reelang.data.local.LocalDataSource
+import com.example.reelang.data.local.entities.PracticeSessionEntity
 import com.example.reelang.network.ApiClient
 import com.example.reelang.network.models.ReviewRequest
+import com.example.reelang.ui.common.LocalDbSource
 import com.example.reelang.ui.common.LocalTTS
 import com.example.reelang.ui.onboarding.*
 import kotlinx.coroutines.delay
@@ -41,6 +45,12 @@ data class PracticeCard(
 )
 
 class PracticeViewModel : ViewModel() {
+
+    private var localDataSource: LocalDataSource? = null
+
+    fun setLocalDataSource(ds: LocalDataSource) {
+        localDataSource = ds
+    }
 
     private val _cards = MutableStateFlow<List<PracticeCard>>(emptyList())
     val cards: StateFlow<List<PracticeCard>> = _cards.asStateFlow()
@@ -117,6 +127,18 @@ class PracticeViewModel : ViewModel() {
         val next = _currentIndex.value + 1
         if (next >= _cards.value.size) {
             _sessionComplete.value = true
+            localDataSource?.let { ds ->
+                viewModelScope.launch {
+                    ds.savePracticeSession(
+                        PracticeSessionEntity(
+                            userId = UserSession.userId,
+                            knownCount = _knownCount.value,
+                            unknownCount = _unknownCount.value,
+                            totalCards = _cards.value.size
+                        )
+                    )
+                }
+            }
         } else {
             _currentIndex.value = next
         }
@@ -142,6 +164,10 @@ fun PracticeScreen(
     val sessionComplete by viewModel.sessionComplete.collectAsState()
     val knownCount by viewModel.knownCount.collectAsState()
     val unknownCount by viewModel.unknownCount.collectAsState()
+    val localDbSource = LocalDbSource.current
+    LaunchedEffect(localDbSource) {
+        localDbSource?.let { viewModel.setLocalDataSource(it) }
+    }
 
     Scaffold(
         containerColor = ReelangCream,
