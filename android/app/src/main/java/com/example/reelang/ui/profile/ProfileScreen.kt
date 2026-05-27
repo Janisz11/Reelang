@@ -471,7 +471,8 @@ fun ProfileScreen(
                     0 -> ThumbnailGrid(
                         items = userReelThumbnails,
                         onReelClick = { reelId ->
-                            navController.navigate("user_reels/${UserSession.userId}/$reelId")
+                            val ownerUserId = if (isOtherUser) targetUserId!! else UserSession.userId
+                            navController.navigate("user_reels/$ownerUserId/$reelId")
                         },
                         onReelLongPress = if (!isOtherUser) { reelId ->
                             effectiveViewModel.deleteReel(reelId)
