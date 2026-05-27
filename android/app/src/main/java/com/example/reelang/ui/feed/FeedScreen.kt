@@ -57,6 +57,7 @@ import com.example.reelang.auth.UserSession
 import com.example.reelang.network.ApiClient
 import com.example.reelang.network.models.ActivityLogRequest
 import com.example.reelang.network.models.CaptionSegment
+import com.example.reelang.network.models.ProfileResponse
 import com.example.reelang.network.models.ReelResponse
 import com.example.reelang.network.models.SaveWordRequest
 import com.example.reelang.ui.words.WordsEventBus
@@ -146,6 +147,9 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
 
     private val _currentStreak = MutableStateFlow(0)
     val currentStreak: StateFlow<Int> = _currentStreak.asStateFlow()
+
+    private val _ownerProfiles = MutableStateFlow<Map<String, ProfileResponse>>(emptyMap())
+    val ownerProfiles: StateFlow<Map<String, ProfileResponse>> = _ownerProfiles.asStateFlow()
 
     private var currentUid: String? = null
 
@@ -375,6 +379,19 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
         }
     }
 
+    fun loadOwnerUsername(ownerId: String) {
+        if (_ownerProfiles.value.containsKey(ownerId)) return
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.getProfile(ownerId, UserSession.userId)
+            }.onSuccess { profile ->
+                _ownerProfiles.value = _ownerProfiles.value + (ownerId to profile)
+            }.onFailure {
+                Log.w("FeedViewModel", "Failed to load owner profile for $ownerId")
+            }
+        }
+    }
+
     fun loadStreak() {
         viewModelScope.launch {
             runCatching {
@@ -491,22 +508,23 @@ fun ReelTopBar(reel: ReelItem, onChannelClick: ((String) -> Unit)? = null) {
                 reel.ownerId?.let { onChannelClick?.invoke(it) }
             }
         ) {
+            val isUploadedReel = reel.youtubeId == null
             Box(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
                     .background(
-                        if (reel.ownerAvatarInitials != null) ReelangRed
+                        if (isUploadedReel) ReelangRed
                         else Color.White.copy(alpha = 0.15f)
                     )
                     .border(1.5.dp, Color.White.copy(alpha = 0.6f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                if (reel.ownerAvatarInitials != null) {
+                if (isUploadedReel && reel.ownerAvatarInitials != null) {
                     Text(
                         text = reel.ownerAvatarInitials,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold,
                         color = Color.White
                     )
                 } else {

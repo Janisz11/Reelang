@@ -25,12 +25,12 @@ def fetch_definition(term: str, language: str = "en") -> Optional[str]:
         if result:
             return result
     
-    # Try Wiktionary
+    
     result = fetch_definition_wiktionary(clean_term, language)
     if result:
         return result
     
-    # Fallback: Google Translate
+   
     if language.lower() != "en":
         try:
             from deep_translator import GoogleTranslator

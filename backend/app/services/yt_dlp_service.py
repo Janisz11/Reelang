@@ -36,7 +36,7 @@ _BASE_OPTS: Dict[str, Any] = {
 # ── Public API ───────────────────────────────────────────────────────────────
 
 def fetch_video_info(youtube_url: str) -> Dict[str, Any]:
-    """Return raw yt-dlp info dict without downloading media."""
+    
     ydl_opts = {
         **_BASE_OPTS,
         "quiet": True,
@@ -49,7 +49,7 @@ def fetch_video_info(youtube_url: str) -> Dict[str, Any]:
 
 
 def extract_metadata(info: Dict[str, Any]) -> Dict[str, Any]:
-    """Pull the fields we care about from a raw info dict."""
+    
     duration_s = info.get("duration") or 0
     return {
         "youtube_id": info["id"],
@@ -61,18 +61,11 @@ def extract_metadata(info: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def download_video_with_captions(youtube_id: str, youtube_url: str) -> List[Dict[str, Any]]:
-    """
-    Download video to /tmp/reels/{youtube_id}.mp4 and fetch captions.
-
-    Three separate steps to avoid "Did not get any data blocks" on Shorts:
-      1. extract_info (no download) → discover available caption languages
-      2. download video only (no subtitle flags)
-      3. download subtitles for chosen language into a temp dir
-    """
+    
     VIDEO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     video_path = VIDEO_CACHE_DIR / f"{youtube_id}.mp4"
 
-    # ── Step 1: discover available captions ──────────────────────────────────
+
     ydl_opts_info = {
         **_BASE_OPTS,
         "quiet": True,
@@ -89,17 +82,17 @@ def download_video_with_captions(youtube_id: str, youtube_url: str) -> List[Dict
     logger.info("Manual subtitles: %s", available_subs)
     logger.info("Auto captions: %s", available_auto)
 
-    # pick preferred language from automatic_captions first, then manual
+    
     chosen_lang = _pick_language(info)
     logger.info("Chosen caption language: %s", chosen_lang)
 
-    # ── Step 2: download video (no subtitle flags to avoid Shorts errors) ────
+    
     try:
         _download_video_file(youtube_url, video_path)
     except Exception as e:
         logger.warning("Video download failed (will use WebView): %s", e)
 
-    # ── Step 3: download subtitles separately ────────────────────────────────
+    
     if not chosen_lang:
         logger.warning("No caption language found for %s", youtube_id)
         return []
@@ -108,10 +101,7 @@ def download_video_with_captions(youtube_id: str, youtube_url: str) -> List[Dict
 
 
 def ensure_video_downloaded(youtube_id: str, youtube_url: str) -> Path:
-    """
-    Ensure the video file exists at /tmp/reels/{youtube_id}.mp4, downloading
-    it on demand if necessary. Returns the file path.
-    """
+  
     VIDEO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     video_path = VIDEO_CACHE_DIR / f"{youtube_id}.mp4"
 
@@ -123,11 +113,7 @@ def ensure_video_downloaded(youtube_id: str, youtube_url: str) -> Path:
 
 
 def fetch_captions(youtube_url: str, language: str) -> List[Dict[str, Any]]:
-    """
-    Download captions for *language* and return parsed segment list.
-    Prefers manual subtitles; falls back to auto-generated.
-    Each item: { start_ms, end_ms, original_text }
-    """
+  
     with tempfile.TemporaryDirectory() as tmpdir:
         subtitle_path, fmt = _download_subtitles(youtube_url, language, tmpdir)
         if subtitle_path is None:
@@ -148,20 +134,20 @@ def _best_thumbnail(info: Dict[str, Any]) -> Optional[str]:
 
 
 def _pick_language(info: Dict[str, Any]) -> Optional[str]:
-    """Return the best caption language available, preferring automatic captions."""
+    
     auto = info.get("automatic_captions") or {}
     manual = info.get("subtitles") or {}
 
-    # preferred languages from automatic_captions first
+    
     for lang in _PREFERRED_LANGS:
         if lang in auto:
             return lang
 
-    # any automatic language
+    
     if auto:
         return next(iter(auto))
 
-    # fall back to manual subtitles
+    
     for lang in _PREFERRED_LANGS:
         if lang in manual:
             return lang
@@ -175,7 +161,7 @@ def _pick_language(info: Dict[str, Any]) -> Optional[str]:
 def _fetch_captions_for_lang(
     youtube_url: str, youtube_id: str, lang: str
 ) -> List[Dict[str, Any]]:
-    """Download subtitle file for *lang* into a temp dir and parse it."""
+   
     with tempfile.TemporaryDirectory() as tmpdir:
         ydl_opts = {
             **_BASE_OPTS,
@@ -198,7 +184,7 @@ def _fetch_captions_for_lang(
         ]
 
         for ext, parser in parsers:
-            # exact expected filename
+           
             candidate = os.path.join(tmpdir, f"{youtube_id}.{lang}.{ext}")
             if os.path.exists(candidate):
                 segments = parser(Path(candidate).read_text(encoding="utf-8"))
@@ -220,14 +206,7 @@ def _fetch_captions_for_lang(
 
 
 def _download_video_file(youtube_url: str, video_path: Path) -> None:
-    """
-    Download video to *video_path*, merging best video+audio streams into mp4.
-
-    Attempt order:
-      1. bestvideo[ext=mp4]+bestaudio[ext=m4a]   native mp4 streams, no re-encode
-      2. bestvideo+bestaudio                      any streams, merge to mp4
-      3. bestvideo+bestaudio/best/bestvideo/best   broadest fallback for Shorts
-    """
+   
     _FORMATS = [
         {
             "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
@@ -266,10 +245,7 @@ def _download_video_file(youtube_url: str, video_path: Path) -> None:
 def _download_subtitles(
     youtube_url: str, language: str, tmpdir: str
 ) -> Tuple[Optional[str], str]:
-    """
-    Try manual subtitles first, then auto-generated.
-    Returns (file_path, format_name) or (None, '').
-    """
+   
     for auto in (False, True):
         for fmt in ("vtt", "srt"):
             opts = {

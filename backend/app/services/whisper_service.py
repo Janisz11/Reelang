@@ -18,7 +18,7 @@ async def transcribe_audio(youtube_id: str, language: str) -> List[Dict]:
     os.makedirs(audio_dir, exist_ok=True)
     audio_path = f"{audio_dir}/{youtube_id}.mp3"
 
-    # Step 1: download audio via yt-dlp
+    
     ydl_opts = {
         "format": "bestaudio/best",
         "outtmpl": f"{audio_dir}/{youtube_id}.%(ext)s",
@@ -34,7 +34,7 @@ async def transcribe_audio(youtube_id: str, language: str) -> List[Dict]:
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([f"https://www.youtube.com/watch?v={youtube_id}"])
 
-    # Step 2: transcribe via Groq Whisper API
+    
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
     with open(audio_path, "rb") as audio_file:
         transcription = client.audio.transcriptions.create(

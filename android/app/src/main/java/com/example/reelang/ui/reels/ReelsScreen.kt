@@ -105,6 +105,7 @@ fun ReelsScreen(
                     val pagerState = rememberPagerState { sortedReels.size }
                     val captionsMap by viewModel.captionsMap.collectAsState()
                     val currentStreak by viewModel.currentStreak.collectAsState()
+                    val ownerProfiles by viewModel.ownerProfiles.collectAsState()
 
                     val watchStartTime = remember { mutableStateOf(System.currentTimeMillis()) }
                     val reelsWatchedSet = remember { mutableStateOf(setOf<String>()) }
@@ -114,6 +115,7 @@ fun ReelsScreen(
                         if (currentReel != null) {
                             viewModel.loadCaptions(currentReel.id)
                             reelsWatchedSet.value = reelsWatchedSet.value + currentReel.id
+                            currentReel.ownerId?.let { viewModel.loadOwnerUsername(it) }
                         }
                         val prevReel = sortedReels.getOrNull(pagerState.settledPage - 1)
                         if (prevReel != null) {
@@ -145,8 +147,15 @@ fun ReelsScreen(
                         modifier = Modifier.fillMaxSize()
                     ) { page ->
                         val reel = sortedReels[page]
+                        val ownerProfile = reel.ownerId?.let { ownerProfiles[it] }
                         ReelCard(
-                            reel = reel.copy(streakDays = currentStreak),
+                            reel = reel.copy(
+                                streakDays = currentStreak,
+                                channelName = if (reel.youtubeId == null && reel.ownerId != null) {
+                                    ownerProfile?.username ?: reel.channelName
+                                } else reel.channelName,
+                                ownerAvatarInitials = ownerProfile?.avatarInitials
+                            ),
                             captions = captionsMap[reel.id] ?: emptyList(),
                             isActive = pagerState.settledPage == page,
                             onLike = { viewModel.toggleLike(reel.id) },
