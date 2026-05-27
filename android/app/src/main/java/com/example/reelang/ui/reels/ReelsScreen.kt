@@ -47,7 +47,8 @@ fun ReelsScreen(
     viewModel: FeedViewModel = viewModel(),
     bottomPadding: Dp = 0.dp,
     onWordClick: (String) -> Unit = {},
-    priorityReelIds: List<String> = emptyList()
+    priorityReelIds: List<String> = emptyList(),
+    onProfileClick: ((String) -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val localDbSource = LocalDbSource.current
@@ -151,7 +152,8 @@ fun ReelsScreen(
                             onLike = { viewModel.toggleLike(reel.id) },
                             onSave = { viewModel.toggleSave(reel.id) },
                             onShare = {},
-                            onWordClick = { word -> viewModel.saveWord(word, reel.language, reel.id) }
+                            onWordClick = { word -> viewModel.saveWord(word, reel.language, reel.id) },
+                            onChannelClick = onProfileClick
                         )
                     }
                 }
@@ -168,7 +170,8 @@ fun ReelCard(
     onLike: () -> Unit,
     onSave: () -> Unit,
     onShare: () -> Unit,
-    onWordClick: (String) -> Unit = {}
+    onWordClick: (String) -> Unit = {},
+    onChannelClick: ((String) -> Unit)? = null
 ) {
     Box(
         modifier = Modifier
@@ -212,7 +215,7 @@ fun ReelCard(
                 .align(Alignment.TopCenter)
         )
 
-        ReelTopBar(reel = reel)
+        ReelTopBar(reel = reel, onChannelClick = onChannelClick)
 
         ReelActions(
             reel = reel,

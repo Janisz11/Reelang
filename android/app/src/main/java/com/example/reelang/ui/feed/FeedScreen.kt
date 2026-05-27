@@ -91,7 +91,10 @@ data class ReelItem(
     val sceneEmoji: String,
     val youtubeId: String? = null,
     val isLiked: Boolean = false,
-    val isSaved: Boolean = false
+    val isSaved: Boolean = false,
+    val ownerId: String? = null,
+    val ownerUsername: String? = null,
+    val ownerAvatarInitials: String? = null
 )
 
 private fun formatCount(n: Int): String = when {
@@ -454,7 +457,10 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
         bgColors = bgColorsFor(language),
         sceneEmoji = sceneEmojiFor(language),
         youtubeId = youtubeId,
-        isLiked = isLiked
+        isLiked = isLiked,
+        ownerId = ownerUserId,
+        ownerUsername = ownerUsername,
+        ownerAvatarInitials = ownerAvatarInitials
     )
 }
 
@@ -467,7 +473,7 @@ class FeedViewModelFactory(private val autoLoad: Boolean) : androidx.lifecycle.V
 // ─── Top Bar ──────────────────────────────────────────────────────────────────
 
 @Composable
-fun ReelTopBar(reel: ReelItem) {
+fun ReelTopBar(reel: ReelItem, onChannelClick: ((String) -> Unit)? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -478,24 +484,52 @@ fun ReelTopBar(reel: ReelItem) {
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.clickable(
+                enabled = reel.ownerId != null && onChannelClick != null
+            ) {
+                reel.ownerId?.let { onChannelClick?.invoke(it) }
+            }
         ) {
             Box(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.15f))
+                    .background(
+                        if (reel.ownerAvatarInitials != null) ReelangRed
+                        else Color.White.copy(alpha = 0.15f)
+                    )
                     .border(1.5.dp, Color.White.copy(alpha = 0.6f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = reel.avatarEmoji, fontSize = 18.sp)
+                if (reel.ownerAvatarInitials != null) {
+                    Text(
+                        text = reel.ownerAvatarInitials,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                } else {
+                    Text(text = reel.avatarEmoji, fontSize = 18.sp)
+                }
             }
-            Text(
-                text = reel.channelName,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White
-            )
+            Column {
+                Text(
+                    text = reel.channelName.ifEmpty {
+                        reel.ownerUsername ?: if (reel.ownerId != null) "User" else "Unknown"
+                    },
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+                if (reel.ownerId != null && reel.channelName.isEmpty()) {
+                    Text(
+                        text = "tap to view profile",
+                        fontSize = 10.sp,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
+            }
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))

@@ -43,6 +43,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.reelang.auth.AuthScreen
 import com.example.reelang.auth.AuthViewModel
+import com.example.reelang.auth.UserSession
 import com.example.reelang.ui.create.CreateReelScreen
 import com.example.reelang.ui.onboarding.OnboardingScreen
 import com.example.reelang.ui.search.SearchScreen
@@ -142,7 +143,12 @@ fun AppNavigation(
             composable("feed") {
                 ReelsScreen(
                     bottomPadding = innerPadding.calculateBottomPadding(),
-                    onWordClick = { wordId -> navController.toWordDetail(wordId) }
+                    onWordClick = { wordId -> navController.toWordDetail(wordId) },
+                    onProfileClick = { userId ->
+                        if (userId != UserSession.userId) {
+                            navController.navigate("profile/$userId")
+                        }
+                    }
                 )
             }
 
@@ -218,7 +224,12 @@ fun AppNavigation(
                 ReelsScreen(
                     bottomPadding = innerPadding.calculateBottomPadding(),
                     onWordClick = { wordId -> navController.toWordDetail(wordId) },
-                    priorityReelIds = reelIds.split(",").filter { it.isNotEmpty() }
+                    priorityReelIds = reelIds.split(",").filter { it.isNotEmpty() },
+                    onProfileClick = { userId ->
+                        if (userId != UserSession.userId) {
+                            navController.navigate("profile/$userId")
+                        }
+                    }
                 )
             }
 
@@ -233,7 +244,12 @@ fun AppNavigation(
                 ReelsScreen(
                     bottomPadding = innerPadding.calculateBottomPadding(),
                     onWordClick = { wordId -> navController.toWordDetail(wordId) },
-                    viewModel = savedFeedViewModel
+                    viewModel = savedFeedViewModel,
+                    onProfileClick = { userId ->
+                        if (userId != UserSession.userId) {
+                            navController.navigate("profile/$userId")
+                        }
+                    }
                 )
             }
 
@@ -249,7 +265,12 @@ fun AppNavigation(
                 ReelsScreen(
                     bottomPadding = innerPadding.calculateBottomPadding(),
                     onWordClick = { wordId -> navController.toWordDetail(wordId) },
-                    viewModel = userFeedViewModel
+                    viewModel = userFeedViewModel,
+                    onProfileClick = { profileUserId ->
+                        if (profileUserId != UserSession.userId) {
+                            navController.navigate("profile/$profileUserId")
+                        }
+                    }
                 )
             }
 

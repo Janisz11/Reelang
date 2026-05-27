@@ -97,7 +97,7 @@ fun AuthScreen(
     val isLoading    = authState is AuthState.Loading
     val errorMessage = (authState as? AuthState.Error)?.message
 
-    // Navigate to onboarding on successful sign-in / registration
+
     LaunchedEffect(authState) {
         if (authState is AuthState.Success) {
             onNavigateToOnboarding()

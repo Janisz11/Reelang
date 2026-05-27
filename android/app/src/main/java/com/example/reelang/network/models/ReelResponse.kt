@@ -20,5 +20,8 @@ data class ReelResponse(
     @SerializedName("duration_ms")     val durationMs: Int?       = null,
     @SerializedName("tags")             val tags: String?          = null,
     @SerializedName("likes_count")      val likesCount: Int        = 0,
-    @SerializedName("is_liked")         val isLiked: Boolean       = false
+    @SerializedName("is_liked")         val isLiked: Boolean       = false,
+    @SerializedName("owner_user_id")        val ownerUserId: String?        = null,
+    @SerializedName("owner_username")       val ownerUsername: String?      = null,
+    @SerializedName("owner_avatar_initials") val ownerAvatarInitials: String? = null
 )

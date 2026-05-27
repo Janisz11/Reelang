@@ -28,8 +28,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -81,7 +84,12 @@ import com.example.reelang.ui.onboarding.ReelangRed
 import com.example.reelang.ui.onboarding.ReelangSurface
 import com.example.reelang.ui.onboarding.ReelangTextPrimary
 import com.example.reelang.ui.onboarding.ReelangTextSecondary
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import coil.request.ImageRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -304,6 +312,25 @@ class ProfileViewModel(private val initialTargetUserId: String? = null) : ViewMo
         }
     }
 
+    fun followUser(targetUserId: String) {
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.followUser(targetUserId, UserSession.userId)
+            }.onSuccess { response ->
+                _profile.value = _profile.value?.copy(
+                    isFollowing = response.following,
+                    followersCount = if (response.following)
+                        (_profile.value?.followersCount ?: 0) + 1
+                    else
+                        maxOf(0, (_profile.value?.followersCount ?: 0) - 1)
+                )
+                SharedState.triggerProfileRefresh()
+            }.onFailure {
+                Log.e("ProfileViewModel", "Failed to follow user", it)
+            }
+        }
+    }
+
     fun deleteReel(reelId: String) {
         viewModelScope.launch {
             runCatching {
@@ -452,6 +479,40 @@ fun ProfileScreen(
                     likes = profile?.totalLikes?.toString() ?: "0"
                 )
                 HorizontalDivider(color = ReelangBorder, thickness = 1.dp)
+            }
+
+            if (isOtherUser) {
+                item {
+                    val isFollowing = profile?.isFollowing ?: false
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(ReelangSurface)
+                            .padding(horizontal = 20.dp, vertical = 12.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                targetUserId?.let { effectiveViewModel.followUser(it) }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isFollowing) Color.Transparent else ReelangRed,
+                                contentColor = if (isFollowing) ReelangRed else Color.White
+                            ),
+                            border = if (isFollowing)
+                                androidx.compose.foundation.BorderStroke(1.dp, ReelangRed)
+                            else null,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = if (isFollowing) "Following" else "Follow",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp
+                            )
+                        }
+                    }
+                    HorizontalDivider(color = ReelangBorder, thickness = 1.dp)
+                }
             }
 
             if (!isOtherUser) item {
@@ -741,21 +802,28 @@ fun PrivateGalleryTab(modifier: Modifier = Modifier, onImageClick: (String) -> U
     val context = LocalContext.current
     val images = remember {
         try {
-            val allFiles = context.assets.list("images") ?: emptyArray()
+            val imageFiles = context.assets.list("images") ?: emptyArray()
+            val videoFiles = try {
+                context.assets.list("videos") ?: emptyArray()
+            } catch (e: Exception) {
+                emptyArray()
+            }
+            val allFiles = imageFiles + videoFiles
             android.util.Log.d("PrivateGallery", "All files: ${allFiles.toList()}")
             allFiles
                 .filter { name ->
                     name.isNotBlank() &&
-                    !name.startsWith(".") &&
-                    !name.startsWith("android-") &&
-                    !name.contains("font") &&
-                    !name.contains("logo") &&
-                    !name.contains("clock") &&
-                    !name.contains("progress") &&
-                    (name.lowercase().endsWith(".jpg") ||
-                     name.lowercase().endsWith(".jpeg")) &&
-                    name.contains("unsplash") &&
-                    name.length > 5
+                            !name.startsWith(".") &&
+                            !name.startsWith("android-") &&
+                            !name.contains("font") &&
+                            !name.contains("logo") &&
+                            !name.contains("clock") &&
+                            !name.contains("progress") &&
+                            (name.lowercase().endsWith(".jpg") ||
+                                    name.lowercase().endsWith(".jpeg") ||
+                                    name.lowercase().endsWith(".mp4")) &&
+                            (name.contains("unsplash") || name.lowercase().endsWith(".mp4")) &&
+                            name.length > 5
                 }
                 .sorted()
                 .also { filtered ->
@@ -812,15 +880,33 @@ fun PrivateImageCell(imageName: String, onClick: () -> Unit = {}, modifier: Modi
             .background(ReelangSurface)
             .clickable { onClick() }
     ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data("file:///android_asset/images/${android.net.Uri.encode(imageName)}")
-                .crossfade(true)
-                .build(),
-            contentDescription = imageName,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        val assetPath = if (imageName.lowercase().endsWith(".mp4"))
+            "file:///android_asset/videos/${android.net.Uri.encode(imageName)}"
+        else
+            "file:///android_asset/images/${android.net.Uri.encode(imageName)}"
+        if (imageName.lowercase().endsWith(".mp4")) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
+        } else {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(assetPath)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = imageName,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 
@@ -893,15 +979,41 @@ fun PrivateImageFullscreenScreen(imageName: String, onBack: () -> Unit) {
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data("file:///android_asset/images/${android.net.Uri.encode(imageName)}")
-                .crossfade(true)
-                .build(),
-            contentDescription = imageName,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize()
-        )
+        val assetPath = if (imageName.lowercase().endsWith(".mp4"))
+            "file:///android_asset/videos/${android.net.Uri.encode(imageName)}"
+        else
+            "file:///android_asset/images/${android.net.Uri.encode(imageName)}"
+        if (imageName.lowercase().endsWith(".mp4")) {
+            val context = LocalContext.current
+            val exoPlayer = remember {
+                ExoPlayer.Builder(context).build().apply {
+                    val uri = android.net.Uri.parse("file:///android_asset/videos/$imageName")
+                    setMediaItem(MediaItem.fromUri(uri))
+                    prepare()
+                    playWhenReady = true
+                }
+            }
+            DisposableEffect(Unit) { onDispose { exoPlayer.release() } }
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        player = exoPlayer
+                        useController = true
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(assetPath)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = imageName,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         androidx.compose.material3.IconButton(
             onClick = onBack,
