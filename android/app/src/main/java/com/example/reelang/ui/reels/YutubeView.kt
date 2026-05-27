@@ -2,12 +2,20 @@ package com.example.reelang.ui.reels
 
 import android.annotation.SuppressLint
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,6 +50,15 @@ fun YouTubeView(
 ) {
     var currentTimeMs by remember { mutableStateOf(0L) }
     val webViewRef = remember { mutableStateOf<android.webkit.WebView?>(null) }
+    var isYouTubePaused by remember { mutableStateOf(false) }
+    var showYouTubePauseIcon by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showYouTubePauseIcon) {
+        if (showYouTubePauseIcon) {
+            delay(800)
+            showYouTubePauseIcon = false
+        }
+    }
 
     LaunchedEffect(isActive) {
         if (isActive) {
@@ -108,7 +125,21 @@ fun YouTubeView(
         Log.d("YouTubeWebView", "caption: ${cap.startMs}-${cap.endMs}: ${cap.originalText}")
     }
 
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier.clickable {
+            isYouTubePaused = !isYouTubePaused
+            showYouTubePauseIcon = true
+            if (isYouTubePaused) {
+                webViewRef.value?.evaluateJavascript(
+                    "try { window.player.pauseVideo(); } catch(e) {}"
+                ) {}
+            } else {
+                webViewRef.value?.evaluateJavascript(
+                    "try { window.player.playVideo(); window.player.unMute(); } catch(e) {}"
+                ) {}
+            }
+        }
+    ) {
         val state = rememberWebViewState(
             url = "https://reelang-player.vercel.app/?id=$youtubeId"
         )
@@ -124,6 +155,31 @@ fun YouTubeView(
                 webViewRef.value = webView
             }
         )
+
+        AnimatedVisibility(
+            visible = showYouTubePauseIcon,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isYouTubePaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+            }
+        }
 
         if (activeCaption != null && !activeCaption.originalText.isNullOrEmpty()) {
             Box(
@@ -179,9 +235,22 @@ fun LocalVideoPlayer(
     }
 
     var currentTimeMs by remember { mutableStateOf(0L) }
+    var isPaused by remember { mutableStateOf(false) }
+    var showPauseIcon by remember { mutableStateOf(false) }
 
     LaunchedEffect(isActive) {
-        exoPlayer.playWhenReady = isActive
+        if (isActive && !isPaused) {
+            exoPlayer.playWhenReady = true
+        } else {
+            exoPlayer.playWhenReady = false
+        }
+    }
+
+    LaunchedEffect(showPauseIcon) {
+        if (showPauseIcon) {
+            delay(800)
+            showPauseIcon = false
+        }
     }
 
     LaunchedEffect(exoPlayer) {
@@ -199,7 +268,13 @@ fun LocalVideoPlayer(
         currentTimeMs >= it.startMs && currentTimeMs <= it.endMs
     }
 
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier.clickable {
+            isPaused = !isPaused
+            exoPlayer.playWhenReady = !isPaused
+            showPauseIcon = true
+        }
+    ) {
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
@@ -210,6 +285,31 @@ fun LocalVideoPlayer(
             },
             modifier = Modifier.fillMaxSize()
         )
+
+        AnimatedVisibility(
+            visible = showPauseIcon,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                        contentDescription = if (isPaused) "Play" else "Pause",
+                        tint = Color.White,
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+            }
+        }
 
         if (activeCaption != null && !activeCaption.originalText.isNullOrEmpty()) {
             Box(

@@ -145,6 +145,22 @@ def get_word(
     return word
 
 
+# ── DELETE /words/{word_id} ───────────────────────────────────────────────────
+
+@router.delete("/{word_id}")
+def delete_word(
+    word_id: str,
+    db: Session = Depends(get_db),
+    x_user_id: str = Header(...),
+):
+    word = db.query(Word).filter(Word.id == word_id, Word.user_id == x_user_id).first()
+    if not word:
+        raise HTTPException(status_code=404, detail="Word not found")
+    db.delete(word)
+    db.commit()
+    return {"ok": True}
+
+
 # ── POST /words/{word_id}/review ──────────────────────────────────────────────
 
 @router.post("/{word_id}/review", response_model=WordResponse)

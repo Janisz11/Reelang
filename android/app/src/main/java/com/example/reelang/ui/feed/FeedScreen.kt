@@ -394,7 +394,7 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
                     )
                 )
             }.onFailure {
-                Log.e("FeedViewModel", "Failed to sync activity", it)
+                Log.e("FeedViewModel", "Failed to sync activity: ${it.message}", it)
             }
         }
     }

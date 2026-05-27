@@ -25,6 +25,8 @@ class Reel(Base):
     tags = Column(String, nullable=True)
     owner_user_id = Column(String, nullable=True)
     likes_count = Column(Integer, default=0, nullable=False)
+    r2_key = Column(String, nullable=True)
+    r2_thumb_key = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     segments = relationship("CaptionSegment", back_populates="reel", cascade="all, delete-orphan")

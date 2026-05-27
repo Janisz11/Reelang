@@ -16,6 +16,7 @@ import com.example.reelang.network.models.WordResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
@@ -91,6 +92,17 @@ interface ReelangApi {
 
     @GET("reels/user/{userId}")
     suspend fun getUserReels(@Path("userId") userId: String): List<ReelResponse>
+
+    @DELETE("reels/{reelId}")
+    suspend fun deleteReel(
+        @Path("reelId") reelId: String,
+        @Query("user_id") userId: String
+    ): retrofit2.Response<Unit>
+
+    @DELETE("words/{wordId}")
+    suspend fun deleteWord(
+        @Path("wordId") wordId: String
+    ): retrofit2.Response<Unit>
 
     @POST("words")
     suspend fun saveWord(

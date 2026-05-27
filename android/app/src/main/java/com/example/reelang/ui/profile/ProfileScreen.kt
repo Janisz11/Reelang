@@ -3,8 +3,10 @@ package com.example.reelang.ui.profile
 import android.util.Log
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -38,11 +41,13 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -299,6 +304,19 @@ class ProfileViewModel(private val initialTargetUserId: String? = null) : ViewMo
         }
     }
 
+    fun deleteReel(reelId: String) {
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.deleteReel(reelId, UserSession.userId)
+            }.onSuccess {
+                _userReels.value = _userReels.value.filter { it.id != reelId }
+                SharedState.triggerProfileRefresh()
+            }.onFailure {
+                Log.e("ProfileViewModel", "Failed to delete reel", it)
+            }
+        }
+    }
+
     fun loadForUser(targetUserId: String) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -454,7 +472,10 @@ fun ProfileScreen(
                         items = userReelThumbnails,
                         onReelClick = { reelId ->
                             navController.navigate("user_reels/${UserSession.userId}/$reelId")
-                        }
+                        },
+                        onReelLongPress = if (!isOtherUser) { reelId ->
+                            effectiveViewModel.deleteReel(reelId)
+                        } else null
                     )
                     1 -> ThumbnailGrid(
                         items = savedPostThumbnails,
@@ -685,7 +706,8 @@ private fun ProfileTabRow(selectedTab: Int, onTabSelected: (Int) -> Unit) {
 @Composable
 private fun ThumbnailGrid(
     items: List<PostThumbnail>,
-    onReelClick: (String) -> Unit = {}
+    onReelClick: (String) -> Unit = {},
+    onReelLongPress: ((String) -> Unit)? = null
 ) {
     val rows = items.chunked(3)
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -698,6 +720,7 @@ private fun ThumbnailGrid(
                     ThumbnailCell(
                         thumb = thumb,
                         onClick = { onReelClick(thumb.reelId ?: thumb.id) },
+                        onLongPress = onReelLongPress?.let { { it(thumb.reelId ?: thumb.id) } },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -800,17 +823,46 @@ fun PrivateImageCell(imageName: String, onClick: () -> Unit = {}, modifier: Modi
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ThumbnailCell(
     thumb: PostThumbnail,
     onClick: () -> Unit = {},
+    onLongPress: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete post?", fontWeight = FontWeight.Bold) },
+            text = { Text("This action cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    onLongPress?.invoke()
+                }) {
+                    Text("Delete", color = ReelangRed, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel", color = ReelangTextSecondary)
+                }
+            },
+            containerColor = ReelangSurface
+        )
+    }
+
     Box(
         modifier = modifier
             .aspectRatio(1f)
             .background(thumb.color)
-            .clickable { onClick() },
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = { if (onLongPress != null) showDeleteDialog = true }
+            ),
         contentAlignment = Alignment.Center
     ) {
         if (thumb.thumbnailUrl != null) {

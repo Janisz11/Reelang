@@ -25,6 +25,7 @@ from ..schemas import (
 )
 from ..services import yt_dlp_service, translation_service
 from ..services.whisper_service import transcribe_audio, transcribe_file
+from ..services.r2_storage import upload_to_r2, get_presigned_url, delete_from_r2
 
 UPLOAD_DIR = Path("/tmp/reels")
 CHUNK_SIZE = 1024 * 1024  # 1mb
@@ -186,21 +187,35 @@ async def upload_reel(
         dest.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"File save failed: {exc}")
 
+    r2_key = None
+    r2_thumb_key = None
+
     if file.content_type and file.content_type.startswith("image/"):
         thumb_dir = Path("/tmp/thumbnails")
         thumb_dir.mkdir(parents=True, exist_ok=True)
         thumb_path = thumb_dir / f"{reel_id}.jpg"
         shutil.copy2(str(dest), str(thumb_path))
         thumbnail_url = f"/api/v1/reels/{reel_id}/thumbnail"
+        r2_key = f"reels/{reel_id}{file_ext}"
+        upload_to_r2(str(dest), r2_key, content_type)
+        r2_thumb_key = f"thumbnails/{reel_id}.jpg"
+        upload_to_r2(str(thumb_path), r2_thumb_key, "image/jpeg")
     else:
         thumb_path_str = generate_thumbnail(str(dest), reel_id)
         thumbnail_url = f"/api/v1/reels/{reel_id}/thumbnail" if thumb_path_str else None
+        r2_key = f"reels/{reel_id}{file_ext}"
+        upload_to_r2(str(dest), r2_key, content_type)
+        if thumb_path_str:
+            r2_thumb_key = f"thumbnails/{reel_id}.jpg"
+            upload_to_r2(thumb_path_str, r2_thumb_key, "image/jpeg")
 
     reel = Reel(
         id=reel_id,
         title=title,
         language=language.lower(),
         file_path=str(dest),
+        r2_key=r2_key,
+        r2_thumb_key=r2_thumb_key,
         tags=tags,
         owner_user_id=owner_user_id,
         thumbnail_url=thumbnail_url,
@@ -357,6 +372,45 @@ def toggle_save(
     return {"saved": True}
 
 
+# ── DELETE /reels/{reel_id} ───────────────────────────────────────────────────
+
+@router.delete("/{reel_id}")
+def delete_reel(
+    reel_id: str,
+    user_id: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    reel = db.query(Reel).filter(
+        Reel.id == reel_id,
+        Reel.owner_user_id == user_id,
+    ).first()
+    if not reel:
+        raise HTTPException(status_code=404, detail="Reel not found or not owned by user")
+
+    if reel.file_path:
+        import os
+        try:
+            os.remove(reel.file_path)
+        except Exception:
+            pass
+
+    thumb_path = Path(f"/tmp/thumbnails/{reel_id}.jpg")
+    if thumb_path.exists():
+        try:
+            thumb_path.unlink()
+        except Exception:
+            pass
+
+    if reel.r2_key:
+        delete_from_r2(reel.r2_key)
+    if reel.r2_thumb_key:
+        delete_from_r2(reel.r2_thumb_key)
+
+    db.delete(reel)
+    db.commit()
+    return {"ok": True}
+
+
 # ── GET /reels/{reel_id} ───────────────────────────────────────────────────────
 
 @router.get("/{reel_id}", response_model=ReelDetailResponse)
@@ -399,13 +453,21 @@ async def transcribe_reel(reel_id: str, db: Session = Depends(get_db)):
 
 @router.get("/{reel_id}/thumbnail")
 def get_thumbnail(reel_id: str, db: Session = Depends(get_db)):
+    from fastapi.responses import RedirectResponse
     reel = db.query(Reel).filter(Reel.id == reel_id).first()
     if not reel:
         raise HTTPException(status_code=404, detail="Reel not found")
+
+    if reel.r2_thumb_key:
+        url = get_presigned_url(reel.r2_thumb_key)
+        if url:
+            return RedirectResponse(url=url)
+
     thumb_path = Path(f"/tmp/thumbnails/{reel_id}.jpg")
-    if not thumb_path.exists():
-        raise HTTPException(status_code=404, detail="Thumbnail not found")
-    return FileResponse(str(thumb_path), media_type="image/jpeg")
+    if thumb_path.exists():
+        return FileResponse(str(thumb_path), media_type="image/jpeg")
+
+    raise HTTPException(status_code=404, detail="Thumbnail not found")
 
 
 # ── GET /reels/{reel_id}/stream ───────────────────────────────────────────────
@@ -426,9 +488,15 @@ def _resolve_video_path(reel: Reel) -> Path:
 
 @router.get("/{reel_id}/stream")
 def stream_reel(reel_id: str, request: Request, db: Session = Depends(get_db)):
+    from fastapi.responses import RedirectResponse
     reel = db.query(Reel).filter(Reel.id == reel_id).first()
     if not reel:
         raise HTTPException(status_code=404, detail="Reel not found")
+
+    if reel.r2_key:
+        url = get_presigned_url(reel.r2_key)
+        if url:
+            return RedirectResponse(url=url)
 
     try:
         video_path = _resolve_video_path(reel)

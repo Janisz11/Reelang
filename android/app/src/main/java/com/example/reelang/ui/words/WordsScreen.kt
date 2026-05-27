@@ -22,15 +22,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -39,9 +44,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -175,6 +182,18 @@ class WordsViewModel : ViewModel() {
                 } ?: run {
                     _uiState.value = UiState.Error("No internet connection")
                 }
+            }
+        }
+    }
+
+    fun deleteWord(wordId: String) {
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.deleteWord(wordId)
+            }.onSuccess {
+                loadWords()
+            }.onFailure {
+                Log.e("WordsViewModel", "Failed to delete word", it)
             }
         }
     }
@@ -319,9 +338,10 @@ fun WordsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(displayedWords, key = { it.id }) { word ->
-                        WordCard(
+                        SwipeableWordCard(
                             word = word,
-                            onClick = { onWordClick(word.id) }
+                            onClick = { onWordClick(word.id) },
+                            onDelete = { viewModel.deleteWord(word.id) }
                         )
                     }
                 }
@@ -376,6 +396,84 @@ private fun StreakBadge() {
             fontWeight = FontWeight.SemiBold,
             color = ReelangRed
         )
+    }
+}
+
+// ─── Swipeable Word Card ──────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SwipeableWordCard(
+    word: Word,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete word?", fontWeight = FontWeight.Bold) },
+            text = { Text("\"${word.term}\" will be removed from your vocabulary.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    onDelete()
+                }) {
+                    Text("Delete", color = ReelangRed, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel", color = ReelangTextSecondary)
+                }
+            },
+            containerColor = ReelangSurface
+        )
+    }
+
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                showDeleteDialog = true
+            }
+            false
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(vertical = 4.dp)
+                    .background(Color(0xFFFFEBEB), RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Row(
+                    modifier = Modifier.padding(end = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = "Delete",
+                        tint = ReelangRed,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        "Delete",
+                        color = ReelangRed,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        },
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true
+    ) {
+        WordCard(word = word, onClick = onClick)
     }
 }
 
