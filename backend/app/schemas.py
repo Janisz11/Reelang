@@ -34,6 +34,7 @@ class ReelResponse(BaseModel):
     title: str
     channel_name: Optional[str] = None
     thumbnail_url: Optional[str]
+    owner_user_id: Optional[str] = None
     duration_ms: Optional[int] = None
     language: str
     level: Optional[str]
