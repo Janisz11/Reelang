@@ -175,6 +175,21 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
         }
     }
 
+    fun loadUserReels(userId: String, startReelId: String) {
+        _uiState.value = UiState.Loading
+        viewModelScope.launch {
+            runCatching {
+                ApiClient.api.getUserReels(userId)
+            }.onSuccess { response ->
+                val reels = response.map { it.toReelItem() }
+                val sorted = reels.sortedBy { if (it.id == startReelId) 0 else 1 }
+                _uiState.value = UiState.Success(sorted)
+            }.onFailure {
+                _uiState.value = UiState.Error(it.message ?: "Failed to load reels")
+            }
+        }
+    }
+
     fun loadSingleReel(reelId: String) {
         _uiState.value = UiState.Loading
         viewModelScope.launch {

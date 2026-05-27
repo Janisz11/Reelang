@@ -191,7 +191,7 @@ fun ReelCard(
                 )
             }
         } else {
-            LocalVideoPlayer(
+            ImageOrVideoPlayer(
                 streamUrl = "${ApiClient.BASE_URL}reels/${reel.id}/stream",
                 isActive = isActive,
                 captions = captions,

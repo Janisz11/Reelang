@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -23,6 +24,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.google.accompanist.web.WebView
 import com.google.accompanist.web.rememberWebViewState
 import com.example.reelang.network.models.CaptionSegment
@@ -239,6 +242,38 @@ fun LocalVideoPlayer(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun ImageOrVideoPlayer(
+    streamUrl: String,
+    isActive: Boolean,
+    captions: List<CaptionSegment> = emptyList(),
+    onWordClick: (String) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    var loadFailed by remember { mutableStateOf(false) }
+
+    if (!loadFailed) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(streamUrl)
+                .crossfade(true)
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = modifier,
+            onError = { loadFailed = true }
+        )
+    } else {
+        LocalVideoPlayer(
+            streamUrl = streamUrl,
+            isActive = isActive,
+            captions = captions,
+            onWordClick = onWordClick,
+            modifier = modifier
+        )
     }
 }
 

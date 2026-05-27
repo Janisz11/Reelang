@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
@@ -75,6 +76,8 @@ import com.example.reelang.ui.onboarding.ReelangRed
 import com.example.reelang.ui.onboarding.ReelangSurface
 import com.example.reelang.ui.onboarding.ReelangTextPrimary
 import com.example.reelang.ui.onboarding.ReelangTextSecondary
+import androidx.compose.ui.platform.LocalContext
+import coil.request.ImageRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -189,6 +192,7 @@ class ProfileViewModel(private val initialTargetUserId: String? = null) : ViewMo
                     if (it > 0) {
                         loadProfile()
                         loadSavedReels()
+                        loadUserReels()
                     }
                 }
             }
@@ -323,7 +327,7 @@ class ProfileViewModelFactory(private val targetUserId: String) : androidx.lifec
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-private val profileTabs = listOf("Posts", "Saved")
+private val profileTabs = listOf("Posts", "Saved", "Private")
 
 @Composable
 fun ProfileScreen(
@@ -358,7 +362,7 @@ fun ProfileScreen(
             thumbnailUrl = when {
                 reel.thumbnailUrl == null -> null
                 reel.thumbnailUrl.startsWith("http") -> reel.thumbnailUrl
-                else -> "${ApiClient.BASE_URL}${reel.thumbnailUrl.trimStart('/')}"
+                else -> "${ApiClient.BASE_URL}reels/${reel.id}/thumbnail"
             },
             reelId = reel.id
         )
@@ -371,13 +375,11 @@ fun ProfileScreen(
             thumbnailUrl = when {
                 reel.thumbnailUrl == null -> null
                 reel.thumbnailUrl.startsWith("http") -> reel.thumbnailUrl
-                else -> "${ApiClient.BASE_URL}${reel.thumbnailUrl.trimStart('/')}"
+                else -> "${ApiClient.BASE_URL}reels/${reel.id}/thumbnail"
             },
             reelId = reel.id
         )
     }
-    val gridItems = if (selectedTab == 0) userReelThumbnails else savedPostThumbnails
-
     Scaffold(
         modifier = modifier,
         containerColor = ReelangCream,
@@ -447,18 +449,25 @@ fun ProfileScreen(
             }
 
             item {
-                ThumbnailGrid(
-                    items = gridItems,
-                    onReelClick = { reelId ->
-                        if (selectedTab == 0) {
-                            val allIds = gridItems.mapNotNull { it.reelId }
-                            val orderedIds = listOf(reelId) + allIds.filter { it != reelId }
-                            navController.navigate("feed_from_search/${orderedIds.joinToString(",")}")
-                        } else {
+                when (selectedTab) {
+                    0 -> ThumbnailGrid(
+                        items = userReelThumbnails,
+                        onReelClick = { reelId ->
+                            navController.navigate("user_reels/${UserSession.userId}/$reelId")
+                        }
+                    )
+                    1 -> ThumbnailGrid(
+                        items = savedPostThumbnails,
+                        onReelClick = { reelId ->
                             navController.navigate("saved_reel/$reelId")
                         }
-                    }
-                )
+                    )
+                    2 -> PrivateGalleryTab(
+                        onImageClick = { imageName ->
+                            navController.navigate("private_image/${android.net.Uri.encode(imageName)}")
+                        }
+                    )
+                }
             }
         }
     }
@@ -701,6 +710,96 @@ private fun ThumbnailGrid(
     }
 }
 
+// ─── Private Gallery ─────────────────────────────────────────────────────────
+
+@Composable
+fun PrivateGalleryTab(modifier: Modifier = Modifier, onImageClick: (String) -> Unit = {}) {
+    val context = LocalContext.current
+    val images = remember {
+        try {
+            val allFiles = context.assets.list("images") ?: emptyArray()
+            android.util.Log.d("PrivateGallery", "All files: ${allFiles.toList()}")
+            allFiles
+                .filter { name ->
+                    name.isNotBlank() &&
+                    !name.startsWith(".") &&
+                    !name.startsWith("android-") &&
+                    !name.contains("font") &&
+                    !name.contains("logo") &&
+                    !name.contains("clock") &&
+                    !name.contains("progress") &&
+                    (name.lowercase().endsWith(".jpg") ||
+                     name.lowercase().endsWith(".jpeg")) &&
+                    name.contains("unsplash") &&
+                    name.length > 5
+                }
+                .sorted()
+                .also { filtered ->
+                    android.util.Log.d("PrivateGallery", "Filtered files: $filtered")
+                }
+        } catch (e: Exception) {
+            android.util.Log.e("PrivateGallery", "Error listing assets", e)
+            emptyList()
+        }
+    }
+
+    if (images.isEmpty()) {
+        Box(
+            modifier = modifier.fillMaxWidth().padding(32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "No private photos",
+                color = ReelangTextSecondary,
+                fontSize = 14.sp
+            )
+        }
+        return
+    }
+
+    val rows = images.chunked(3)
+    Column(modifier = modifier.fillMaxWidth()) {
+        rows.forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                row.forEach { imageName ->
+                    PrivateImageCell(
+                        imageName = imageName,
+                        onClick = { onImageClick(imageName) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                repeat(3 - row.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+            Spacer(Modifier.height(2.dp))
+        }
+    }
+}
+
+@Composable
+fun PrivateImageCell(imageName: String, onClick: () -> Unit = {}, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .background(ReelangSurface)
+            .clickable { onClick() }
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data("file:///android_asset/images/${android.net.Uri.encode(imageName)}")
+                .crossfade(true)
+                .build(),
+            contentDescription = imageName,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
 @Composable
 private fun ThumbnailCell(
     thumb: PostThumbnail,
@@ -727,6 +826,40 @@ private fun ThumbnailCell(
                 text = thumb.emoji,
                 fontSize = 30.sp,
                 textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+// ─── Private Image Fullscreen ─────────────────────────────────────────────────
+
+@Composable
+fun PrivateImageFullscreenScreen(imageName: String, onBack: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data("file:///android_asset/images/${android.net.Uri.encode(imageName)}")
+                .crossfade(true)
+                .build(),
+            contentDescription = imageName,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        androidx.compose.material3.IconButton(
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(top = 40.dp, start = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = Color.White
             )
         }
     }

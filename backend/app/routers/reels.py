@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import shutil
 import subprocess
 import uuid
 from datetime import datetime
@@ -151,19 +152,31 @@ def generate_thumbnail(video_path: str, reel_id: str) -> Optional[str]:
 @router.post("/upload", response_model=ReelUploadResponse, status_code=201)
 async def upload_reel(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(..., media_type="video/mp4"),
+    file: UploadFile = File(...),
     title: str = Form(...),
     language: str = Form(...),
     tags: Optional[str] = Form(None),
     owner_user_id: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
-    if file.content_type and not file.content_type.startswith("video/"):
-       raise HTTPException(status_code=422, detail="Only video files are accepted")
+    if file.content_type and not (
+        file.content_type.startswith("video/") or
+        file.content_type.startswith("image/")
+    ):
+        raise HTTPException(status_code=422, detail="Only video or image files are accepted")
 
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     reel_id = str(uuid.uuid4())
-    dest = UPLOAD_DIR / f"{reel_id}.mp4"
+    content_type = file.content_type or "video/mp4"
+    if content_type.startswith("image/jpeg") or content_type.startswith("image/jpg"):
+        file_ext = ".jpg"
+    elif content_type.startswith("image/png"):
+        file_ext = ".png"
+    elif content_type.startswith("image/webp"):
+        file_ext = ".webp"
+    else:
+        file_ext = ".mp4"
+    dest = UPLOAD_DIR / f"{reel_id}{file_ext}"
 
     try:
         with dest.open("wb") as out:
@@ -173,7 +186,15 @@ async def upload_reel(
         dest.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"File save failed: {exc}")
 
-    thumb_path = generate_thumbnail(str(dest), reel_id)
+    if file.content_type and file.content_type.startswith("image/"):
+        thumb_dir = Path("/tmp/thumbnails")
+        thumb_dir.mkdir(parents=True, exist_ok=True)
+        thumb_path = thumb_dir / f"{reel_id}.jpg"
+        shutil.copy2(str(dest), str(thumb_path))
+        thumbnail_url = f"/api/v1/reels/{reel_id}/thumbnail"
+    else:
+        thumb_path_str = generate_thumbnail(str(dest), reel_id)
+        thumbnail_url = f"/api/v1/reels/{reel_id}/thumbnail" if thumb_path_str else None
 
     reel = Reel(
         id=reel_id,
@@ -182,7 +203,7 @@ async def upload_reel(
         file_path=str(dest),
         tags=tags,
         owner_user_id=owner_user_id,
-        thumbnail_url=f"/api/v1/reels/{reel_id}/thumbnail" if thumb_path else None,
+        thumbnail_url=thumbnail_url,
     )
     db.add(reel)
     db.commit()
@@ -418,6 +439,9 @@ def stream_reel(reel_id: str, request: Request, db: Session = Depends(get_db)):
 
     if not video_path.exists():
         raise HTTPException(status_code=404, detail="Video file not found on disk")
+
+    if video_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp']:
+        return FileResponse(str(video_path), media_type="image/jpeg")
 
     file_size = video_path.stat().st_size
     range_header = request.headers.get("Range")

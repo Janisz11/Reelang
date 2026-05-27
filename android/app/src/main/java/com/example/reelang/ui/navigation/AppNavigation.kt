@@ -47,6 +47,7 @@ import com.example.reelang.ui.create.CreateReelScreen
 import com.example.reelang.ui.onboarding.OnboardingScreen
 import com.example.reelang.ui.search.SearchScreen
 import com.example.reelang.ui.reels.ReelsScreen
+import com.example.reelang.ui.profile.PrivateImageFullscreenScreen
 import com.example.reelang.ui.profile.ProfileScreen
 import com.example.reelang.ui.profile.ProfileViewModel
 import com.example.reelang.ui.profile.SettingsScreen
@@ -233,6 +234,32 @@ fun AppNavigation(
                     bottomPadding = innerPadding.calculateBottomPadding(),
                     onWordClick = { wordId -> navController.toWordDetail(wordId) },
                     viewModel = savedFeedViewModel
+                )
+            }
+
+            composable("user_reels/{userId}/{startReelId}") { backStack ->
+                val userId = backStack.arguments?.getString("userId") ?: ""
+                val startReelId = backStack.arguments?.getString("startReelId") ?: ""
+                val userFeedViewModel: FeedViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+                    factory = FeedViewModelFactory(autoLoad = false)
+                )
+                LaunchedEffect(userId, startReelId) {
+                    userFeedViewModel.loadUserReels(userId, startReelId)
+                }
+                ReelsScreen(
+                    bottomPadding = innerPadding.calculateBottomPadding(),
+                    onWordClick = { wordId -> navController.toWordDetail(wordId) },
+                    viewModel = userFeedViewModel
+                )
+            }
+
+            composable("private_image/{imageName}") { backStack ->
+                val imageName = android.net.Uri.decode(
+                    backStack.arguments?.getString("imageName") ?: ""
+                )
+                PrivateImageFullscreenScreen(
+                    imageName = imageName,
+                    onBack = { navController.popBackStack() }
                 )
             }
 

@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,8 +58,10 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.reelang.auth.UserSession
 import com.example.reelang.network.ApiClient
+import com.example.reelang.ui.SharedState
 import com.example.reelang.ui.onboarding.ReelangBorder
 import com.example.reelang.ui.onboarding.ReelangCream
 import com.example.reelang.ui.onboarding.ReelangRed
@@ -91,28 +94,33 @@ class CreateReelViewModel : ViewModel() {
 
     private val _uploadState = MutableStateFlow<UploadState>(UploadState.Idle)
     val uploadState: StateFlow<UploadState> = _uploadState.asStateFlow()
-    fun uploadReel(videoFile: File, title: String, language: String, tags: String = "") {
+
+    fun uploadReel(
+        file: File,
+        title: String,
+        language: String,
+        tags: String = "",
+        mimeType: String = "video/*"
+    ) {
         viewModelScope.launch {
             _uploadState.value = UploadState.Loading
             try {
-                val videoPart = MultipartBody.Part.createFormData(
+                val mediaPart = MultipartBody.Part.createFormData(
                     "file",
-                    videoFile.name,
-                    videoFile.asRequestBody("video/*".toMediaTypeOrNull())
+                    file.name,
+                    file.asRequestBody(mimeType.toMediaTypeOrNull())
                 )
                 val titleBody = title.toRequestBody("text/plain".toMediaTypeOrNull())
                 val langBody = language.toRequestBody("text/plain".toMediaTypeOrNull())
                 val tagsBody = tags.toRequestBody("text/plain".toMediaTypeOrNull())
                 val ownerBody = UserSession.userId.toRequestBody("text/plain".toMediaTypeOrNull())
-                ApiClient.api.uploadReel(videoPart, titleBody, langBody, tagsBody, ownerBody)
+                ApiClient.api.uploadReel(mediaPart, titleBody, langBody, tagsBody, ownerBody)
                 _uploadState.value = UploadState.Success
             } catch (e: Exception) {
                 _uploadState.value = UploadState.Error(e.message ?: "Upload failed")
             }
         }
     }
-
-
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -134,12 +142,13 @@ fun CreateReelScreen(
     var tags by remember { mutableStateOf("") }
     var languageMenuExpanded by remember { mutableStateOf(false) }
 
-    val videoPicker = rememberLauncherForActivityResult(
+    val mediaPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> if (uri != null) selectedUri = uri }
 
     LaunchedEffect(uploadState) {
         if (uploadState is UploadState.Success) {
+            SharedState.triggerProfileRefresh()
             navController.navigate("feed") {
                 popUpTo(0) { inclusive = true }
             }
@@ -179,11 +188,11 @@ fun CreateReelScreen(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Video picker
+            // Media picker
             Button(
                 onClick = {
-                    videoPicker.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+                    mediaPicker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -191,15 +200,20 @@ fun CreateReelScreen(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    text = if (selectedUri == null) "Wybierz wideo" else "Zmień wideo",
+                    text = if (selectedUri == null) "Wybierz zdjęcie / wideo" else "Zmień media",
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 15.sp
                 )
             }
 
-            // Video preview
+            // Media preview
             if (selectedUri != null) {
-                VideoPreview(uri = selectedUri!!)
+                val isImage = isImageUri(context, selectedUri!!)
+                if (isImage) {
+                    ImagePreview(uri = selectedUri!!)
+                } else {
+                    VideoPreview(uri = selectedUri!!)
+                }
             }
 
             // Title
@@ -277,8 +291,9 @@ fun CreateReelScreen(
                 onClick = {
                     val uri = selectedUri ?: return@Button
                     if (title.isBlank()) return@Button
-                    val videoFile = copyUriToTempFile(context, uri) ?: return@Button
-                    viewModel.uploadReel(videoFile, title, selectedLanguage, tags)
+                    val mimeType = context.contentResolver.getType(uri) ?: "video/*"
+                    val file = copyUriToTempFile(context, uri, mimeType) ?: return@Button
+                    viewModel.uploadReel(file, title, selectedLanguage, tags, mimeType)
                 },
                 enabled = selectedUri != null &&
                         title.isNotBlank() &&
@@ -314,6 +329,21 @@ fun CreateReelScreen(
     }
 }
 
+// ─── Image Preview ────────────────────────────────────────────────────────────
+
+@Composable
+private fun ImagePreview(uri: Uri) {
+    AsyncImage(
+        model = uri,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp)
+            .clip(RoundedCornerShape(12.dp))
+    )
+}
+
 // ─── Video Preview ────────────────────────────────────────────────────────────
 
 @Composable
@@ -347,10 +377,21 @@ private fun VideoPreview(uri: Uri) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-private fun copyUriToTempFile(context: Context, uri: Uri): File? {
+fun isImageUri(context: Context, uri: Uri): Boolean {
+    val type = context.contentResolver.getType(uri)
+    return type?.startsWith("image/") == true
+}
+
+private fun copyUriToTempFile(context: Context, uri: Uri, mimeType: String = "video/*"): File? {
     return try {
         val input = context.contentResolver.openInputStream(uri) ?: return null
-        val temp = File.createTempFile("reel_upload_", ".mp4", context.cacheDir)
+        val ext = when {
+            mimeType.startsWith("image/jpeg") || mimeType.startsWith("image/jpg") -> ".jpg"
+            mimeType.startsWith("image/png") -> ".png"
+            mimeType.startsWith("image/webp") -> ".webp"
+            else -> ".mp4"
+        }
+        val temp = File.createTempFile("reel_upload_", ext, context.cacheDir)
         FileOutputStream(temp).use { out -> input.copyTo(out) }
         temp
     } catch (_: Exception) {
