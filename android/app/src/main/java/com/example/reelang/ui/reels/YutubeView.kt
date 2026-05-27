@@ -226,12 +226,25 @@ fun LocalVideoPlayer(
 ) {
     val context = LocalContext.current
     val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(streamUrl))
-            prepare()
-            repeatMode = ExoPlayer.REPEAT_MODE_ONE
-            playWhenReady = false
-        }
+        val okHttpDataSource = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(
+            okhttp3.OkHttpClient.Builder()
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .build()
+        )
+        val dataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(
+            context, okHttpDataSource
+        )
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(
+                androidx.media3.exoplayer.source.DefaultMediaSourceFactory(dataSourceFactory)
+            )
+            .build().apply {
+                setMediaItem(MediaItem.fromUri(streamUrl))
+                prepare()
+                repeatMode = ExoPlayer.REPEAT_MODE_ONE
+                playWhenReady = false
+            }
     }
 
     var currentTimeMs by remember { mutableStateOf(0L) }
@@ -355,25 +368,31 @@ fun ImageOrVideoPlayer(
 ) {
     var loadFailed by remember { mutableStateOf(false) }
 
-    if (!loadFailed) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(streamUrl)
-                .crossfade(true)
-                .build(),
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = modifier,
-            onError = { loadFailed = true }
-        )
-    } else {
-        LocalVideoPlayer(
-            streamUrl = streamUrl,
-            isActive = isActive,
-            captions = captions,
-            onWordClick = onWordClick,
-            modifier = modifier
-        )
+    Box(modifier = modifier) {
+        if (!loadFailed) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(streamUrl)
+                    .crossfade(true)
+                    .allowHardware(false)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+                onSuccess = { loadFailed = false },
+                onError = { loadFailed = true }
+            )
+        }
+
+        if (loadFailed) {
+            LocalVideoPlayer(
+                streamUrl = streamUrl,
+                isActive = isActive,
+                captions = captions,
+                onWordClick = onWordClick,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 

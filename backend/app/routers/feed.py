@@ -19,7 +19,6 @@ def get_feed(
     limit: int = Query(10, ge=1, le=20),
     db: Session = Depends(get_db),
 ):
-   
     rows = db.execute(
         text("""
             SELECT r.* FROM user_feed_queue q
@@ -31,6 +30,10 @@ def get_feed(
         {"uid": user_id, "limit": limit},
     ).fetchall()
 
+    if not rows:
+        reels = db.query(Reel).order_by(Reel.created_at.desc()).limit(limit).all()
+        rows = [r.__dict__ for r in reels]
+
     liked_ids = {
         r.reel_id for r in db.query(ReelLike).filter(ReelLike.user_id == user_id).all()
     }
@@ -38,20 +41,13 @@ def get_feed(
         r.reel_id for r in db.query(SavedReel).filter(SavedReel.user_id == user_id).all()
     }
 
-    if not rows:
-        reels = db.query(Reel).order_by(Reel.created_at.desc()).limit(limit).all()
-        result = []
-        for reel in reels:
-            d = {c.name: getattr(reel, c.name) for c in reel.__table__.columns}
-            d["is_liked"] = reel.id in liked_ids
-            d["is_saved"] = reel.id in saved_ids
-            result.append(d)
-        return result
-
-    return [
-        dict(r._mapping) | {"is_liked": r.id in liked_ids, "is_saved": r.id in saved_ids}
-        for r in rows
-    ]
+    result = []
+    for row in rows:
+        d = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
+        d["is_liked"] = d.get("id") in liked_ids
+        d["is_saved"] = d.get("id") in saved_ids
+        result.append(d)
+    return result
 
 
 @router.post("/consumed/{reel_id}")

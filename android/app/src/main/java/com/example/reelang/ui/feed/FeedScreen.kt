@@ -356,7 +356,7 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
                 _uiState.value = UiState.Success(list.map { reel ->
                     if (reel.id == id) reel.copy(
                         isSaved = response.saved,
-                        saves = if (response.saved) reel.saves + 1 else reel.saves - 1
+                        saves = if (response.saved) reel.saves + 1 else maxOf(0, reel.saves - 1)
                     ) else reel
                 })
                 SharedState.triggerProfileRefresh()
@@ -393,8 +393,11 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
                         wordsSaved = 0
                     )
                 )
-            }.onFailure {
-                Log.e("FeedViewModel", "Failed to sync activity: ${it.message}", it)
+            }.onFailure { e ->
+                if (e !is java.net.UnknownHostException &&
+                    e !is java.net.ConnectException) {
+                    Log.e("FeedViewModel", "Failed to sync activity: ${e.message}", e)
+                }
             }
         }
     }
