@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 async def import_reel_to_backend(reel_data: Dict) -> str | None:
-    """Import a YouTube reel via backend API. Returns reel_id or None."""
+   
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
@@ -40,7 +40,7 @@ async def import_reel_to_backend(reel_data: Dict) -> str | None:
 async def enqueue_reel_for_user(
     user_id: str, reel_id: str, score: float, db: Session
 ) -> bool:
-    """Add reel to user's feed queue. Returns False if already present."""
+    
     try:
         existing = db.execute(
             text(
@@ -67,7 +67,7 @@ async def enqueue_reel_for_user(
 
 
 async def curate_feed_for_user(user_id: str, db: Session, count: int = 5) -> int:
-    """Find and enqueue new reels for a user. Returns number of reels added."""
+    
     profile = get_user_profile(user_id, db)
 
     existing_yt_ids = db.execute(
@@ -115,7 +115,7 @@ async def curate_feed_for_user(user_id: str, db: Session, count: int = 5) -> int
 
 
 async def run_curation_cycle(db: Session) -> None:
-    """Main curation cycle — refill queues for all users who need it."""
+    
     logger.info("Starting curation cycle...")
 
     users = get_users_needing_refill(db)

@@ -23,7 +23,7 @@ def create_scheduler() -> AsyncIOScheduler:
 
 
 async def run_curation_job() -> None:
-    """Wrapper for the curation cycle with its own DB session."""
+    
     logger.info("Running scheduled feed curation...")
     db = SessionLocal()
     try:

@@ -45,7 +45,7 @@ async def transcribe_audio(youtube_id: str, language: str) -> List[Dict]:
             timestamp_granularities=["segment"],
         )
 
-    # Step 3: parse segments
+    
     logger.info(f"Transcription type: {type(transcription)}")
     logger.info(f"Segments type: {type(transcription.segments)}")
     if transcription.segments:

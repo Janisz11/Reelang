@@ -34,7 +34,7 @@ async def search_youtube_shorts(
     exclude_ids: List[str] = [],
     tags: List[str] = [],
 ) -> List[Dict]:
-    """Search YouTube for language learning Shorts."""
+    
     if not YOUTUBE_API_KEY:
         logger.error("YOUTUBE_API_KEY not set")
         return []
