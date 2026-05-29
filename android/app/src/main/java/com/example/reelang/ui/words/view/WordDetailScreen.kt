@@ -1,4 +1,4 @@
-package com.example.reelang.ui.words
+package com.example.reelang.ui.words.view
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -60,6 +60,12 @@ import com.example.reelang.ui.onboarding.ReelangRed
 import com.example.reelang.ui.onboarding.ReelangSurface
 import com.example.reelang.ui.onboarding.ReelangTextPrimary
 import com.example.reelang.ui.onboarding.ReelangTextSecondary
+import com.example.reelang.ui.words.model.ContextQuote
+import com.example.reelang.ui.words.model.Translation
+import com.example.reelang.ui.words.model.Variation
+import com.example.reelang.ui.words.model.WordDetail
+import com.example.reelang.ui.words.viewmodel.WordDetailViewModel
+import com.example.reelang.ui.words.viewmodel.WordDetailViewModelFactory
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 

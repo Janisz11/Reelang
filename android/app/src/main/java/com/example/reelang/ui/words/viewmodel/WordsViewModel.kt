@@ -1,4 +1,4 @@
-package com.example.reelang.ui.words
+package com.example.reelang.ui.words.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -8,6 +8,10 @@ import com.example.reelang.data.local.entities.WordEntity
 import com.example.reelang.network.ApiClient
 import com.example.reelang.network.models.WordResponse
 import com.example.reelang.ui.common.UiState
+import com.example.reelang.ui.words.WordsEventBus
+import com.example.reelang.ui.words.model.Word
+import com.example.reelang.ui.words.model.WordStatus
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +31,7 @@ class WordsViewModel : ViewModel() {
 
     private var currentUid: String? = null
 
-    private val authListener = com.google.firebase.auth.FirebaseAuth.AuthStateListener { fa ->
+    private val authListener = FirebaseAuth.AuthStateListener { fa ->
         val newUid = fa.currentUser?.uid
         if (newUid != null && newUid != currentUid) {
             currentUid = newUid
@@ -39,8 +43,8 @@ class WordsViewModel : ViewModel() {
     }
 
     init {
-        currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
-        com.google.firebase.auth.FirebaseAuth.getInstance().addAuthStateListener(authListener)
+        currentUid = FirebaseAuth.getInstance().currentUser?.uid
+        FirebaseAuth.getInstance().addAuthStateListener(authListener)
         loadWords()
         viewModelScope.launch {
             WordsEventBus.wordSaved.collect { loadWords() }
@@ -48,7 +52,7 @@ class WordsViewModel : ViewModel() {
     }
 
     override fun onCleared() {
-        com.google.firebase.auth.FirebaseAuth.getInstance().removeAuthStateListener(authListener)
+        FirebaseAuth.getInstance().removeAuthStateListener(authListener)
     }
 
     fun loadWords() {

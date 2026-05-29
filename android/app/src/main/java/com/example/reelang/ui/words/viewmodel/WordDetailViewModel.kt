@@ -1,4 +1,4 @@
-package com.example.reelang.ui.words
+package com.example.reelang.ui.words.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -7,6 +7,8 @@ import com.example.reelang.network.ApiClient
 import com.example.reelang.network.models.WordLookupResponse
 import com.example.reelang.network.models.WordResponse
 import com.example.reelang.ui.common.UiState
+import com.example.reelang.ui.words.model.Translation
+import com.example.reelang.ui.words.model.WordDetail
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

@@ -53,9 +53,9 @@ import com.example.reelang.ui.profile.ProfileScreen
 import com.example.reelang.ui.profile.ProfileViewModel
 import com.example.reelang.ui.profile.SettingsScreen
 import com.example.reelang.ui.profile.StatsScreen
-import com.example.reelang.ui.words.PracticeScreen
-import com.example.reelang.ui.words.WordDetailScreen
-import com.example.reelang.ui.words.WordsScreen
+import com.example.reelang.ui.words.view.PracticeScreen
+import com.example.reelang.ui.words.view.WordDetailScreen
+import com.example.reelang.ui.words.view.WordsScreen
 import com.example.reelang.ui.onboarding.ReelangCream
 import com.example.reelang.ui.onboarding.ReelangRed
 import com.example.reelang.ui.onboarding.ReelangSurface

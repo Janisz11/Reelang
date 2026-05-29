@@ -1,4 +1,4 @@
-package com.example.reelang.ui.words
+package com.example.reelang.ui.words.model
 
 enum class WordStatus { LEARNING, MASTERED }
 

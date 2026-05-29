@@ -1,4 +1,4 @@
-package com.example.reelang.ui.words
+package com.example.reelang.ui.words.model
 
 data class Translation(val language: String, val text: String)
 

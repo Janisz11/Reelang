@@ -1,4 +1,4 @@
-package com.example.reelang.ui.words
+package com.example.reelang.ui.words.view
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -71,6 +71,9 @@ import com.example.reelang.ui.onboarding.ReelangRed
 import com.example.reelang.ui.onboarding.ReelangSurface
 import com.example.reelang.ui.onboarding.ReelangTextPrimary
 import com.example.reelang.ui.onboarding.ReelangTextSecondary
+import com.example.reelang.ui.words.model.Word
+import com.example.reelang.ui.words.model.WordStatus
+import com.example.reelang.ui.words.viewmodel.WordsViewModel
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 

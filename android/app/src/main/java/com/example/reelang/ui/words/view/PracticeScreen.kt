@@ -1,6 +1,7 @@
-package com.example.reelang.ui.words
+package com.example.reelang.ui.words.view
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,6 +24,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.reelang.ui.common.LocalDbSource
 import com.example.reelang.ui.common.LocalTTS
 import com.example.reelang.ui.onboarding.*
+import com.example.reelang.ui.words.model.PracticeCard
+import com.example.reelang.ui.words.viewmodel.PracticeViewModel
 import kotlinx.coroutines.delay
 
 @Composable
@@ -383,7 +386,7 @@ fun PracticeResultScreen(
         OutlinedButton(
             onClick = onBack,
             modifier = Modifier.fillMaxWidth(),
-            border = androidx.compose.foundation.BorderStroke(1.dp, ReelangRed),
+            border = BorderStroke(1.dp, ReelangRed),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = ReelangRed),
             shape = RoundedCornerShape(12.dp)
         ) {

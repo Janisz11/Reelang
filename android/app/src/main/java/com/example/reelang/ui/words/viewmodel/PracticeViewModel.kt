@@ -1,4 +1,4 @@
-package com.example.reelang.ui.words
+package com.example.reelang.ui.words.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,6 +7,8 @@ import com.example.reelang.data.local.LocalDataSource
 import com.example.reelang.data.local.entities.PracticeSessionEntity
 import com.example.reelang.network.ApiClient
 import com.example.reelang.network.models.ReviewRequest
+import com.example.reelang.ui.words.model.PracticeCard
+import com.example.reelang.ui.words.WordsEventBus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
