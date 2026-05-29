@@ -42,18 +42,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.collectAsState
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.reelang.network.ApiClient
-import com.example.reelang.network.models.WordResponse
 import com.example.reelang.ui.common.LocalTTS
 import com.example.reelang.ui.common.UiState
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -63,91 +54,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
-import com.example.reelang.network.models.WordLookupResponse
 import com.example.reelang.ui.onboarding.ReelangBorder
 import com.example.reelang.ui.onboarding.ReelangCream
 import com.example.reelang.ui.onboarding.ReelangRed
 import com.example.reelang.ui.onboarding.ReelangSurface
 import com.example.reelang.ui.onboarding.ReelangTextPrimary
 import com.example.reelang.ui.onboarding.ReelangTextSecondary
-
-// ─── Model ────────────────────────────────────────────────────────────────────
-
-data class Translation(val language: String, val text: String)
-
-data class ContextQuote(
-    val text: String,
-    val highlightWord: String,
-    val source: String
-)
-
-data class Variation(val label: String, val value: String)
-
-data class WordDetail(
-    val id: String,
-    val term: String,
-    val phonetic: String,
-    val partOfSpeech: String,
-    val definition: String,
-    val translation: String,
-    val translations: List<Translation>,
-    val contextQuotes: List<ContextQuote>,
-    val variations: List<Variation>,
-    val language: String = ""
-)
-
-// ─── ViewModel ────────────────────────────────────────────────────────────────
-
-class WordDetailViewModel(private val wordId: String) : ViewModel() {
-
-    private val _uiState = MutableStateFlow<UiState<WordDetail>>(UiState.Loading)
-    val uiState: StateFlow<UiState<WordDetail>> = _uiState.asStateFlow()
-
-    init {
-        loadDetail()
-    }
-
-    fun loadDetail() {
-        _uiState.value = UiState.Loading
-        viewModelScope.launch {
-            try {
-                val wordResponse = ApiClient.api.getWordById(wordId)
-                val lookup = try {
-                    ApiClient.api.lookupWord(
-                        term = wordResponse.term,
-                        language = wordResponse.language,
-                        targetLang = "en"
-                    )
-                } catch (e: Exception) { null }
-                val detail = wordResponse.toWordDetail(lookup)
-                _uiState.value = UiState.Success(detail)
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to load word")
-            }
-        }
-    }
-
-    private fun WordResponse.toWordDetail(lookup: WordLookupResponse?) = WordDetail(
-        id = id,
-        term = term,
-        phonetic = "",
-        partOfSpeech = "",
-        definition = lookup?.definition ?: definition ?: "",
-        translation = lookup?.translation ?: "",
-        translations = if (lookup?.translation != null)
-            listOf(Translation("EN", lookup.translation))
-        else emptyList(),
-        contextQuotes = emptyList(),
-        variations = emptyList(),
-        language = language
-    )
-}
-
-class WordDetailViewModelFactory(private val wordId: String) : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T =
-        WordDetailViewModel(wordId) as T
-}
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 

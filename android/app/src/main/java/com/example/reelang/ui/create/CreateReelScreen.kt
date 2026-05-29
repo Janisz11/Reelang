@@ -51,16 +51,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.reelang.auth.UserSession
-import com.example.reelang.network.ApiClient
 import com.example.reelang.ui.SharedState
 import com.example.reelang.ui.onboarding.ReelangBorder
 import com.example.reelang.ui.onboarding.ReelangCream
@@ -68,60 +64,10 @@ import com.example.reelang.ui.onboarding.ReelangRed
 import com.example.reelang.ui.onboarding.ReelangSurface
 import com.example.reelang.ui.onboarding.ReelangTextPrimary
 import com.example.reelang.ui.onboarding.ReelangTextSecondary
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.asRequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.FileOutputStream
 
-// ─── State ────────────────────────────────────────────────────────────────────
 
-sealed interface UploadState {
-    object Idle : UploadState
-    object Loading : UploadState
-    object Success : UploadState
-    data class Error(val message: String) : UploadState
-}
-
-// ─── ViewModel ────────────────────────────────────────────────────────────────
-
-class CreateReelViewModel : ViewModel() {
-
-    private val _uploadState = MutableStateFlow<UploadState>(UploadState.Idle)
-    val uploadState: StateFlow<UploadState> = _uploadState.asStateFlow()
-
-    fun uploadReel(
-        file: File,
-        title: String,
-        language: String,
-        tags: String = "",
-        mimeType: String = "video/*"
-    ) {
-        viewModelScope.launch {
-            _uploadState.value = UploadState.Loading
-            try {
-                val mediaPart = MultipartBody.Part.createFormData(
-                    "file",
-                    file.name,
-                    file.asRequestBody(mimeType.toMediaTypeOrNull())
-                )
-                val titleBody = title.toRequestBody("text/plain".toMediaTypeOrNull())
-                val langBody = language.toRequestBody("text/plain".toMediaTypeOrNull())
-                val tagsBody = tags.toRequestBody("text/plain".toMediaTypeOrNull())
-                val ownerBody = UserSession.userId.toRequestBody("text/plain".toMediaTypeOrNull())
-                ApiClient.api.uploadReel(mediaPart, titleBody, langBody, tagsBody, ownerBody)
-                _uploadState.value = UploadState.Success
-            } catch (e: Exception) {
-                _uploadState.value = UploadState.Error(e.message ?: "Upload failed")
-            }
-        }
-    }
-}
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -293,7 +239,7 @@ fun CreateReelScreen(
                     if (title.isBlank()) return@Button
                     val mimeType = context.contentResolver.getType(uri) ?: "video/*"
                     val file = copyUriToTempFile(context, uri, mimeType) ?: return@Button
-                    viewModel.uploadReel(file, title, selectedLanguage, tags, mimeType)
+                    viewModel.uploadReel(context, file, title, selectedLanguage, tags, mimeType)
                 },
                 enabled = selectedUri != null &&
                         title.isNotBlank() &&

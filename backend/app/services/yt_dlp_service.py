@@ -235,7 +235,7 @@ def _download_video_file(youtube_url: str, video_path: Path) -> None:
         except Exception as exc:
             logger.warning("Format %r failed (%s), trying next", fmt_opts["format"], exc)
             last_exc = exc
-            # remove partial file so next attempt starts clean
+            
             if video_path.exists():
                 video_path.unlink()
 
@@ -285,14 +285,14 @@ def _parse_json3(raw: str) -> List[Dict[str, Any]]:
     segments: List[Dict[str, Any]] = []
     for event in data.get("events", []):
         segs = event.get("segs")
-        if not segs:  # skip positioning/styling events that have no text
+        if not segs:  
             continue
         start_ms = event.get("tStartMs", 0)
         end_ms = start_ms + event.get("dDurationMs", 3000)
         text = "".join(s.get("utf8", "") for s in segs).strip()
         if not text or text == "\n":
             continue
-        # deduplicate consecutive identical segments (common in auto-subs)
+        
         if not segments or segments[-1]["original_text"] != text:
             segments.append({"start_ms": start_ms, "end_ms": end_ms, "original_text": text})
     return segments
