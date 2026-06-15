@@ -7,7 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.reelang.auth.AuthViewModel
+import com.example.reelang.auth.viewmodel.AuthViewModel
 import com.example.reelang.data.local.LocalDataSource
 import com.example.reelang.data.local.ReelangDatabase
 import com.example.reelang.ui.common.LocalDbSource

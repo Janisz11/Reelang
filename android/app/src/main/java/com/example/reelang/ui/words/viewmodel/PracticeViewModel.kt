@@ -2,7 +2,7 @@ package com.example.reelang.ui.words.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.reelang.auth.UserSession
+import com.example.reelang.auth.model.UserSession
 import com.example.reelang.data.local.LocalDataSource
 import com.example.reelang.data.local.entities.PracticeSessionEntity
 import com.example.reelang.network.ApiClient

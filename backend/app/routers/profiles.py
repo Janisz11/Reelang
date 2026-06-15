@@ -3,11 +3,12 @@ from typing import List, Optional
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..dependencies import get_current_user_id, get_optional_user_id
 from ..models import ActivityLog, Follow, Profile, Reel, Word
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
@@ -40,8 +41,8 @@ class ProfileResponse(BaseModel):
 
 
 class ProfileUpdateRequest(BaseModel):
-    username: Optional[str] = None
-    bio: Optional[str] = None
+    username: Optional[str] = Field(None, max_length=50)
+    bio: Optional[str] = Field(None, max_length=300)
     avatar_initials: Optional[str] = None
 
 
@@ -66,7 +67,7 @@ def _is_following(db: Session, viewer_id: Optional[str], target_id: str) -> bool
 
 # NOTE: /me/stats must be defined before /{profile_user_id} to avoid route shadowing
 @router.get("/me/stats", response_model=ActivityStatsResponse)
-def get_my_stats(user_id: str = Query(...), db: Session = Depends(get_db)):
+def get_my_stats(user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
     vocab_count = db.query(Word).filter(Word.user_id == user_id).count()
 
     total_watch_ms = (
@@ -131,7 +132,7 @@ def get_my_stats(user_id: str = Query(...), db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=ProfileResponse)
-def get_my_profile(user_id: str = Query(...), db: Session = Depends(get_db)):
+def get_my_profile(user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
     profile = db.query(Profile).filter(Profile.user_id == user_id).first()
     if not profile:
         profile = Profile(
@@ -149,7 +150,7 @@ def get_my_profile(user_id: str = Query(...), db: Session = Depends(get_db)):
 @router.put("/me", response_model=ProfileResponse)
 def update_my_profile(
     payload: ProfileUpdateRequest,
-    user_id: str = Query(...),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     profile = db.query(Profile).filter(Profile.user_id == user_id).first()
@@ -169,14 +170,14 @@ def update_my_profile(
 @router.get("/search", response_model=List[ProfileResponse])
 def search_profiles(
     q: str = Query(..., min_length=1),
-    user_id: Optional[str] = Query(None),
+    viewer_id: Optional[str] = Depends(get_optional_user_id),
     db: Session = Depends(get_db),
 ):
     profiles = (
         db.query(Profile).filter(Profile.username.ilike(f"%{q}%")).limit(20).all()
     )
     return [
-        ProfileResponse(**p.__dict__, is_following=_is_following(db, user_id, p.user_id))
+        ProfileResponse(**p.__dict__, is_following=_is_following(db, viewer_id, p.user_id))
         for p in profiles
     ]
 
@@ -184,7 +185,7 @@ def search_profiles(
 @router.get("/{profile_user_id}", response_model=ProfileResponse)
 def get_profile(
     profile_user_id: str,
-    user_id: Optional[str] = Query(None),
+    viewer_id: Optional[str] = Depends(get_optional_user_id),
     db: Session = Depends(get_db),
 ):
     profile = db.query(Profile).filter(Profile.user_id == profile_user_id).first()
@@ -192,14 +193,14 @@ def get_profile(
         raise HTTPException(status_code=404, detail="Profile not found")
     return ProfileResponse(
         **profile.__dict__,
-        is_following=_is_following(db, user_id, profile_user_id),
+        is_following=_is_following(db, viewer_id, profile_user_id),
     )
 
 
 @router.post("/{profile_user_id}/follow")
 def follow_user(
     profile_user_id: str,
-    user_id: str = Query(...),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     if user_id == profile_user_id:

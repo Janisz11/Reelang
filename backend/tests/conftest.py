@@ -1,44 +1,57 @@
+import os
+from typing import Optional
+
 import pytest
+from fastapi import Header
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from app.main import app
-from app.database import get_db, Base
+from app.database import get_db
+from app.dependencies import get_current_user_id, get_optional_user_id
 
-SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///./test.db"
+TEST_USER_ID = "test-user"
 
-engine = create_engine(
-    SQLALCHEMY_TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
+
+def override_get_current_user_id(authorization: Optional[str] = Header(None)) -> str:
+    if authorization and authorization.startswith("Bearer "):
+        return authorization[len("Bearer "):]
+    return TEST_USER_ID
+
+
+def override_get_optional_user_id(authorization: Optional[str] = Header(None)) -> Optional[str]:
+    if authorization and authorization.startswith("Bearer "):
+        return authorization[len("Bearer "):]
+    return None
+
+SQLALCHEMY_TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL", "postgresql://reelang:reelang@localhost:5432/reelang_test"
 )
+
+engine = create_engine(SQLALCHEMY_TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 @pytest.fixture(scope="function")
 def db():
-    Base.metadata.create_all(bind=engine)
-    with engine.connect() as conn:
-        conn.execute(text(
-            "CREATE TABLE IF NOT EXISTS user_feed_queue ("
-            "id TEXT, "
-            "user_id TEXT NOT NULL, "
-            "reel_id TEXT NOT NULL, "
-            "consumed INTEGER NOT NULL DEFAULT 0, "
-            "score REAL NOT NULL DEFAULT 0.0, "
-            "added_at TEXT, "
-            "PRIMARY KEY (user_id, reel_id)"
-            ")"
-        ))
-        conn.commit()
-    session = TestingSessionLocal()
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = TestingSessionLocal(bind=connection)
+
+    nested = connection.begin_nested()
+
+    @event.listens_for(session, "after_transaction_end")
+    def restart_savepoint(sess, trans):
+        nonlocal nested
+        if not nested.is_active:
+            nested = connection.begin_nested()
+
     try:
         yield session
     finally:
         session.close()
-        Base.metadata.drop_all(bind=engine)
-        with engine.connect() as conn:
-            conn.execute(text("DROP TABLE IF EXISTS user_feed_queue"))
-            conn.commit()
+        transaction.rollback()
+        connection.close()
 
 
 @pytest.fixture(scope="function")
@@ -50,6 +63,8 @@ def client(db):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user_id] = override_get_current_user_id
+    app.dependency_overrides[get_optional_user_id] = override_get_optional_user_id
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

@@ -6,7 +6,7 @@ import httpx
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ..config import BACKEND_URL, REELS_PER_RUN
+from ..config import BACKEND_URL, INTERNAL_API_TOKEN, REELS_PER_RUN
 from ..recommenders.user_profiler import (
     get_all_active_users,
     get_user_profile,
@@ -27,6 +27,7 @@ DEFAULT_CURATE_COUNT = 5
 
 async def import_reel_to_backend(reel_data: Dict) -> str | None:
     try:
+        headers = {"X-Internal-Token": INTERNAL_API_TOKEN} if INTERNAL_API_TOKEN else {}
         async with httpx.AsyncClient(timeout=HTTP_CLIENT_TIMEOUT) as client:
             resp = await client.post(
                 f"{BACKEND_URL}/api/v1/reels/import",
@@ -37,6 +38,7 @@ async def import_reel_to_backend(reel_data: Dict) -> str | None:
                     "topic": reel_data.get("topic", "language_learning"),
                     "tags": reel_data.get("tags"),
                 },
+                headers=headers,
             )
             if resp.status_code in HTTP_SUCCESS_STATUSES:
                 return resp.json().get("reel_id")

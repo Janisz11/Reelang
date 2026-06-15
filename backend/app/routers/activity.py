@@ -1,11 +1,12 @@
 import uuid
 from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..dependencies import get_current_user_id
 from ..models import ActivityLog, Profile
 
 router = APIRouter(prefix="/activity", tags=["activity"])
@@ -20,7 +21,7 @@ class ActivityUpdateRequest(BaseModel):
 @router.post("/log")
 def log_activity(
     payload: ActivityUpdateRequest,
-    user_id: str = Query(...),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     today = date.today()

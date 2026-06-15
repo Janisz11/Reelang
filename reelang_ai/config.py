@@ -5,6 +5,7 @@ load_dotenv()
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://api:8000")
+INTERNAL_API_TOKEN = os.getenv("INTERNAL_API_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 SCHEDULER_INTERVAL_MINUTES = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "30"))
 QUEUE_MIN_SIZE = int(os.getenv("QUEUE_MIN_SIZE", "5"))

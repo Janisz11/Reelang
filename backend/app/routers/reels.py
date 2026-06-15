@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import re
 import shutil
@@ -14,7 +12,14 @@ from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..dependencies import (
+    get_current_user_id,
+    get_optional_user_id,
+    verify_admin_token,
+    verify_internal_token,
+)
 from ..models import CaptionSegment, Reel, ReelLike, SavedReel, Profile
+from ..rate_limit import limiter
 from ..schemas import (
     CaptionSegmentResponse,
     ReelDetailResponse,
@@ -87,12 +92,15 @@ async def _transcribe_uploaded_reel(
 # ── POST /reels/import ────────────────────────────────────────────────────────
 
 @router.post("/import", response_model=ReelImportResponse, status_code=201)
+@limiter.limit("10/minute")
 async def import_reel(
+    request: Request,
     payload: ReelImportRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    _: None = Depends(verify_internal_token),
 ):
-   
+
     try:
         info = yt_dlp_service.fetch_video_info(payload.youtube_url)
     except Exception as exc:
@@ -151,14 +159,16 @@ def generate_thumbnail(video_path: str, reel_id: str) -> Optional[str]:
 # ── POST /reels/upload ────────────────────────────────────────────────────────
 
 @router.post("/upload", response_model=ReelUploadResponse, status_code=201)
+@limiter.limit("5/minute")
 async def upload_reel(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     title: str = Form(...),
     language: str = Form(...),
     tags: Optional[str] = Form(None),
-    owner_user_id: Optional[str] = Form(None),
     db: Session = Depends(get_db),
+    owner_user_id: str = Depends(get_current_user_id),
 ):
     if file.content_type and not (
         file.content_type.startswith("video/") or
@@ -245,7 +255,7 @@ def list_reels(
     tags: Optional[str] = Query(None),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    user_id: Optional[str] = Query(None),
+    viewer_id: Optional[str] = Depends(get_optional_user_id),
     db: Session = Depends(get_db),
 ):
     from sqlalchemy import or_
@@ -261,12 +271,12 @@ def list_reels(
         q = q.filter(or_(*[Reel.tags.contains(tag) for tag in tag_list]))
     reels = q.order_by(Reel.created_at.desc()).offset(offset).limit(limit).all()
 
-    if user_id:
+    if viewer_id:
         liked_ids = {
-            r.reel_id for r in db.query(ReelLike).filter(ReelLike.user_id == user_id).all()
+            r.reel_id for r in db.query(ReelLike).filter(ReelLike.user_id == viewer_id).all()
         }
         saved_ids = {
-            r.reel_id for r in db.query(SavedReel).filter(SavedReel.user_id == user_id).all()
+            r.reel_id for r in db.query(SavedReel).filter(SavedReel.user_id == viewer_id).all()
         }
         result = []
         for reel in reels:
@@ -282,7 +292,7 @@ def list_reels(
 # ── GET /reels/saved ──────────────────────────────────────────────────────────
 
 @router.get("/saved", response_model=List[ReelResponse])
-def get_saved_reels(user_id: str = Query(...), db: Session = Depends(get_db)):
+def get_saved_reels(user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
     from sqlalchemy import text
     rows = db.execute(
         text("""
@@ -313,7 +323,7 @@ def get_user_reels(user_id: str, db: Session = Depends(get_db)):
 @router.post("/{reel_id}/like")
 def toggle_like(
     reel_id: str,
-    user_id: str = Query(...),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     reel = db.query(Reel).filter(Reel.id == reel_id).first()
@@ -350,7 +360,7 @@ def toggle_like(
 @router.post("/{reel_id}/save")
 def toggle_save(
     reel_id: str,
-    user_id: str = Query(...),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     reel = db.query(Reel).filter(Reel.id == reel_id).first()
@@ -377,7 +387,7 @@ def toggle_save(
 @router.delete("/{reel_id}")
 def delete_reel(
     reel_id: str,
-    user_id: str = Query(...),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     reel = db.query(Reel).filter(
@@ -424,7 +434,11 @@ def get_reel(reel_id: str, db: Session = Depends(get_db)):
 # ── POST /reels/{reel_id}/transcribe ─────────────────────────────────────────
 
 @router.post("/{reel_id}/transcribe")
-async def transcribe_reel(reel_id: str, db: Session = Depends(get_db)):
+async def transcribe_reel(
+    reel_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_token),
+):
     reel = db.query(Reel).filter(Reel.id == reel_id).first()
     if not reel:
         raise HTTPException(status_code=404, detail="Reel not found")

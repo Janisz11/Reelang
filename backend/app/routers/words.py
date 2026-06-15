@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import List
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..dependencies import get_current_user_id
 from ..models import Word
 from ..schemas import WordCreateRequest, WordResponse
 from ..services.dictionary_service import fetch_definition
@@ -46,12 +47,12 @@ def sm2_update(
 def add_word(
     payload: WordCreateRequest,
     db: Session = Depends(get_db),
-    x_user_id: str = Header(...),
+    user_id: str = Depends(get_current_user_id),
 ):
     existing = (
         db.query(Word)
         .filter(
-            Word.user_id == x_user_id,
+            Word.user_id == user_id,
             Word.term == payload.term,
             Word.language == payload.language,
         )
@@ -63,7 +64,7 @@ def add_word(
     definition = fetch_definition(payload.term, payload.language)
 
     word = Word(
-        user_id=x_user_id,
+        user_id=user_id,
         term=payload.term,
         definition=definition,
         language=payload.language,
@@ -113,9 +114,9 @@ def lookup_word(
 def list_words(
     due_only: bool = Query(False),
     db: Session = Depends(get_db),
-    x_user_id: str = Header(...),
+    user_id: str = Depends(get_current_user_id),
 ):
-    q = db.query(Word).filter(Word.user_id == x_user_id)
+    q = db.query(Word).filter(Word.user_id == user_id)
     if due_only:
         q = q.filter(
             (Word.next_review == None) |  # noqa: E711
@@ -133,11 +134,11 @@ def list_words(
 def get_word(
     word_id: str,
     db: Session = Depends(get_db),
-    x_user_id: str = Header(...),
+    user_id: str = Depends(get_current_user_id),
 ):
     word = (
         db.query(Word)
-        .filter(Word.id == word_id, Word.user_id == x_user_id)
+        .filter(Word.id == word_id, Word.user_id == user_id)
         .first()
     )
     if not word:
@@ -151,9 +152,9 @@ def get_word(
 def delete_word(
     word_id: str,
     db: Session = Depends(get_db),
-    x_user_id: str = Header(...),
+    user_id: str = Depends(get_current_user_id),
 ):
-    word = db.query(Word).filter(Word.id == word_id, Word.user_id == x_user_id).first()
+    word = db.query(Word).filter(Word.id == word_id, Word.user_id == user_id).first()
     if not word:
         raise HTTPException(status_code=404, detail="Word not found")
     db.delete(word)
@@ -168,11 +169,11 @@ def review_word(
     word_id: str,
     payload: ReviewRequest,
     db: Session = Depends(get_db),
-    x_user_id: str = Header(...),
+    user_id: str = Depends(get_current_user_id),
 ):
     word = (
         db.query(Word)
-        .filter(Word.id == word_id, Word.user_id == x_user_id)
+        .filter(Word.id == word_id, Word.user_id == user_id)
         .first()
     )
     if not word:

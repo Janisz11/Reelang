@@ -1,7 +1,10 @@
 from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, HttpUrl
+from urllib.parse import urlparse
+from pydantic import BaseModel, Field, HttpUrl, field_validator
+
+YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}
 
 
 # ── Reel ────────────────────────────────────────────────────────────────────
@@ -12,6 +15,14 @@ class ReelImportRequest(BaseModel):
     level: Optional[str] = None
     topic: Optional[str] = None
     tags: Optional[str] = None
+
+    @field_validator("youtube_url")
+    @classmethod
+    def validate_youtube_url(cls, v: str) -> str:
+        host = (urlparse(v).hostname or "").lower()
+        if host not in YOUTUBE_HOSTS:
+            raise ValueError("youtube_url must be a youtube.com or youtu.be URL")
+        return v
 
 
 class ReelImportResponse(BaseModel):
@@ -73,8 +84,8 @@ class CaptionSegmentResponse(BaseModel):
 # ── Words ────────────────────────────────────────────────────────────────────
 
 class WordCreateRequest(BaseModel):
-    term: str
-    language: str
+    term: str = Field(..., max_length=200)
+    language: str = Field(..., max_length=10)
     reel_id: Optional[str] = None
     segment_id: Optional[str] = None
 

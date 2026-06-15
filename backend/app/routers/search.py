@@ -2,15 +2,18 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
+from ..rate_limit import limiter
 from ..services.youtube_search_service import get_video_details, search_videos
 
 router = APIRouter(prefix="/search", tags=["search"])
 
 
 @router.get("", response_model=Dict[str, Any])
+@limiter.limit("20/minute")
 def search(
+    request: Request,
     q: str = Query(..., description="Search query"),
     language: str = Query("en", description="Relevance language (ISO 639-1)"),
     max_results: int = Query(10, ge=1, le=50),
@@ -29,7 +32,9 @@ def search(
 
 
 @router.get("/details", response_model=List[Dict[str, Any]])
+@limiter.limit("20/minute")
 def video_details(
+    request: Request,
     ids: str = Query(..., description="Comma-separated YouTube video IDs"),
 ):
     """

@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import List
 
 from fastapi import APIRouter, Depends, Query
@@ -6,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..dependencies import get_current_user_id
 from ..models import Reel, ReelLike, SavedReel
 from ..schemas import ReelResponse
 
@@ -15,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("", response_model=List[ReelResponse])
 def get_feed(
-    user_id: str = Query(...),
+    user_id: str = Depends(get_current_user_id),
     limit: int = Query(10, ge=1, le=20),
     db: Session = Depends(get_db),
 ):
@@ -53,7 +55,7 @@ def get_feed(
 @router.post("/consumed/{reel_id}")
 def mark_consumed(
     reel_id: str,
-    user_id: str = Query(...),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
    
@@ -80,7 +82,7 @@ def mark_consumed(
 
 @router.post("/refill")
 def trigger_refill(
-    user_id: str = Query(...),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     """Check queue size and trigger AI agent refill if needed."""
@@ -95,8 +97,9 @@ def trigger_refill(
 
     if remaining < 5:
         try:
+            base_url = os.environ.get("REELANG_AI_INTERNAL_URL", "http://reelang_ai:8001")
             resp = httpx.post(
-                f"http://reelang_ai:8001/trigger/{user_id}",
+                f"{base_url}/trigger/{user_id}",
                 timeout=5.0,
             )
             logger.info(f"Agent trigger response: {resp.status_code}")
