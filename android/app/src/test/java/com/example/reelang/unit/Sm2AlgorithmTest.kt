@@ -1,80 +1,69 @@
 package com.example.reelang.unit
 
+import com.example.reelang.util.Sm2Algorithm
 import org.junit.Test
 import org.junit.Assert.*
 
 class Sm2AlgorithmTest {
 
-    private fun sm2Update(
-        repetitions: Int,
-        easiness: Float,
-        intervalDays: Int,
-        quality: Int
-    ): Triple<Int, Float, Int> {
-        val newInterval = if (quality >= 3) {
-            when (repetitions) {
-                0 -> 1
-                1 -> 6
-                else -> (intervalDays * easiness).toInt()
-            }
-        } else 1
-        val newRepetitions = if (quality >= 3) repetitions + 1 else 0
-        val newEasiness = maxOf(
-            1.3f,
-            easiness + (0.1f - (5 - quality) * (0.08f + (5 - quality) * 0.02f))
-        )
-        return Triple(newRepetitions, newEasiness, newInterval)
+    companion object {
+        private const val INITIAL_EASINESS = 2.5f
+        private const val MIN_EASINESS = 1.3f
+        private const val SECOND_REVIEW_INTERVAL = 6
+        private const val EXPECTED_THIRD_INTERVAL = 15
+        private const val MASTERY_REPS = 5
+        private const val EASINESS_DECAY_ITERATIONS = 20
     }
 
     @Test
     fun `first correct answer sets interval to 1`() {
-        val (reps, _, interval) = sm2Update(0, 2.5f, 1, 4)
+        val (reps, _, interval) = Sm2Algorithm.update(0, INITIAL_EASINESS, 1, known = true)
         assertEquals(1, reps)
         assertEquals(1, interval)
     }
 
     @Test
     fun `second correct answer sets interval to 6`() {
-        val (reps, _, interval) = sm2Update(1, 2.5f, 1, 4)
+        val (reps, _, interval) = Sm2Algorithm.update(1, INITIAL_EASINESS, 1, known = true)
         assertEquals(2, reps)
-        assertEquals(6, interval)
+        assertEquals(SECOND_REVIEW_INTERVAL, interval)
     }
 
     @Test
     fun `third correct answer multiplies interval by easiness`() {
-        val (reps, _, interval) = sm2Update(2, 2.5f, 6, 4)
+        val (reps, _, interval) = Sm2Algorithm.update(2, INITIAL_EASINESS, SECOND_REVIEW_INTERVAL, known = true)
         assertEquals(3, reps)
-        assertEquals(15, interval)
+        assertEquals(EXPECTED_THIRD_INTERVAL, interval)
     }
 
     @Test
     fun `wrong answer resets repetitions to 0`() {
-        val (reps, _, interval) = sm2Update(3, 2.5f, 15, 1)
+        val (reps, _, interval) = Sm2Algorithm.update(3, INITIAL_EASINESS, EXPECTED_THIRD_INTERVAL, known = false)
         assertEquals(0, reps)
         assertEquals(1, interval)
     }
 
     @Test
     fun `easiness never drops below 1_3`() {
-        var easiness = 2.5f
-        repeat(20) {
-            val (_, newEasiness, _) = sm2Update(0, easiness, 1, 0)
+        var easiness = INITIAL_EASINESS
+        repeat(EASINESS_DECAY_ITERATIONS) {
+            val (_, newEasiness, _) = Sm2Algorithm.update(0, easiness, 1, known = false)
             easiness = newEasiness
         }
-        assertTrue(easiness >= 1.3f)
+        assertTrue(easiness >= MIN_EASINESS)
     }
 
     @Test
     fun `five correct answers marks word as mastered`() {
         var reps = 0
-        var easiness = 2.5f
+        var easiness = INITIAL_EASINESS
         var interval = 1
-        repeat(5) {
-            val result = sm2Update(reps, easiness, interval, 4)
+        repeat(MASTERY_REPS) {
+            val result = Sm2Algorithm.update(reps, easiness, interval, known = true)
             reps = result.first
             easiness = result.second
             interval = result.third
         }
-        assertTrue(reps >= 5)
+        assertTrue(reps >= MASTERY_REPS)
     }
 }

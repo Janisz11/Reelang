@@ -175,20 +175,16 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
 
     fun toggleLike(id: String) {
         val list = (_uiState.value as? UiState.Success)?.data ?: return
+        val originalReel = list.find { it.id == id } ?: return
         viewModelScope.launch {
             runCatching {
                 ApiClient.api.toggleLike(id, UserSession.userId)
             }.onSuccess { response ->
-                _uiState.value = UiState.Success(list.map { reel ->
-                    if (reel.id == id) reel.copy(
-                        isLiked = response.liked,
-                        likes = response.likesCount
-                    ) else reel
-                })
+                _uiState.value = UiState.Success(applyLikeSuccess(list, id, response.liked, response.likesCount))
                 SharedState.triggerProfileRefresh()
             }.onFailure {
                 Log.e("FeedViewModel", "Failed to toggle like", it)
-                _uiState.value = UiState.Success(list)
+                _uiState.value = UiState.Success(applyLikeFailure(list, id, originalReel.isLiked, originalReel.likes))
             }
         }
     }
@@ -248,20 +244,16 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
 
     fun toggleSave(id: String) {
         val list = (_uiState.value as? UiState.Success)?.data ?: return
+        val originalReel = list.find { it.id == id } ?: return
         viewModelScope.launch {
             runCatching {
                 ApiClient.api.toggleSave(id, UserSession.userId)
             }.onSuccess { response ->
-                _uiState.value = UiState.Success(list.map { reel ->
-                    if (reel.id == id) reel.copy(
-                        isSaved = response.saved,
-                        saves = if (response.saved) reel.saves + 1 else maxOf(0, reel.saves - 1)
-                    ) else reel
-                })
+                _uiState.value = UiState.Success(applySaveSuccess(list, id, response.saved, response.savesCount))
                 SharedState.triggerProfileRefresh()
             }.onFailure {
                 Log.e("FeedViewModel", "Failed to toggle save", it)
-                _uiState.value = UiState.Success(list)
+                _uiState.value = UiState.Success(applySaveFailure(list, id, originalReel.isSaved, originalReel.saves))
             }
         }
     }
@@ -367,3 +359,15 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
         ownerAvatarInitials = ownerAvatarInitials
     )
 }
+
+internal fun applyLikeSuccess(list: List<ReelItem>, id: String, liked: Boolean, likesCount: Int): List<ReelItem> =
+    list.map { if (it.id == id) it.copy(isLiked = liked, likes = likesCount) else it }
+
+internal fun applySaveSuccess(list: List<ReelItem>, id: String, saved: Boolean, savesCount: Int): List<ReelItem> =
+    list.map { if (it.id == id) it.copy(isSaved = saved, saves = savesCount) else it }
+
+internal fun applyLikeFailure(reels: List<ReelItem>, id: String, originalLiked: Boolean, originalLikes: Int): List<ReelItem> =
+    reels.map { if (it.id == id) it.copy(isLiked = originalLiked, likes = originalLikes) else it }
+
+internal fun applySaveFailure(reels: List<ReelItem>, id: String, originalSaved: Boolean, originalSaves: Int): List<ReelItem> =
+    reels.map { if (it.id == id) it.copy(isSaved = originalSaved, saves = originalSaves) else it }

@@ -216,18 +216,90 @@ All endpoints are prefixed with `/api/v1/`.
 
 ## Tests
 
-The backend has integration tests using `pytest` and FastAPI's `TestClient` against an in-memory SQLite database.
+### Prerequisites
 
-### Test files
-- `tests/test_api_reels.py` — reel CRUD, upload, like/unlike toggle, captions
-- `tests/test_api_words.py` — word save, lookup, SM-2 review
-- `tests/test_api_profiles.py` — profile creation, update, follow/unfollow
-- `tests/test_api_feed.py` — feed retrieval, consumed marking
+Integration tests (backend + ReeLang AI) require PostgreSQL. Start it with Docker before running them:
 
-### Running tests
-```bash
+```powershell
 cd backend
-python -m pytest tests/ -v
+docker compose up -d postgres
+```
+
+---
+
+### Run all tests
+
+```powershell
+# from repo root — runs unit + integration for all three components
+.\run-tests.ps1
+```
+
+---
+
+### Android
+
+```powershell
+cd android
+
+# all unit tests
+.\gradlew.bat testDebugUnitTest
+
+# single test class
+.\gradlew.bat testDebugUnitTest --tests "com.example.reelang.unit.Sm2AlgorithmTest"
+
+# single test method
+.\gradlew.bat testDebugUnitTest --tests "com.example.reelang.unit.Sm2AlgorithmTest.first review sets interval to 1"
+
+# instrumented (integration) tests — requires connected device/emulator
+.\gradlew.bat connectedAndroidTest
+```
+
+---
+
+### Backend
+
+```powershell
+cd backend
+$py = ".\.venv\Scripts\python.exe"
+
+# all unit tests
+& $py -m pytest tests/unit -v
+
+# all integration tests  (needs postgres running)
+& $py -m pytest tests/integration -v
+
+# single test file
+& $py -m pytest tests/unit/test_translation_chunking.py -v
+
+# single test class
+& $py -m pytest tests/integration/test_api_reels.py::test_reel_like_increases_count -v
+
+# single test method
+& $py -m pytest "tests/unit/test_translation_chunking.py::TestTranslateText::test_api_exception_returns_none" -v
+```
+
+---
+
+### ReeLang AI
+
+```powershell
+cd reelang_ai
+$py = ".\..\backend\.venv\Scripts\python.exe"
+
+# all unit tests
+& $py -m pytest tests/unit -v
+
+# all integration tests  (needs postgres running)
+& $py -m pytest tests/integration -v
+
+# single test file
+& $py -m pytest tests/unit/test_feed_curator.py -v
+
+# single test class
+& $py -m pytest "tests/unit/test_youtube_source.py::TestSearchYoutubeShorts" -v
+
+# single test method
+& $py -m pytest "tests/integration/test_queue_manager.py::TestEnqueueReel::test_enqueues_new_reel" -v
 ```
 
 ---

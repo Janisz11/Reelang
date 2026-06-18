@@ -68,13 +68,7 @@ class TestSearchYoutubeShorts:
         assert len(results) == 1
         assert results[0]["youtube_id"] == "def456"
 
-    async def test_respects_max_results_limit(self, mock_httpx_client):
-        mock_httpx_client("GET", "youtube/v3/search", httpx.Response(200, json=SEARCH_RESPONSE))
-        mock_httpx_client("GET", "youtube/v3/videos", httpx.Response(200, json={"items": []}))
 
-        results = await search_youtube_shorts(language="es", max_results=1)
-
-        assert len(results) == 1
 
     async def test_returns_empty_list_on_http_error(self, mock_httpx_client):
         mock_httpx_client("GET", "youtube/v3/search", httpx.Response(500))

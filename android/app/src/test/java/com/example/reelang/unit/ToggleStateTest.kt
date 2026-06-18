@@ -1,136 +1,148 @@
 package com.example.reelang.unit
 
+import com.example.reelang.ui.feed.model.ReelItem
+import com.example.reelang.ui.feed.viewmodel.applyLikeFailure
+import com.example.reelang.ui.feed.viewmodel.applyLikeSuccess
+import com.example.reelang.ui.feed.viewmodel.applySaveFailure
+import com.example.reelang.ui.feed.viewmodel.applySaveSuccess
 import org.junit.Assert.*
 import org.junit.Test
 
 class ToggleStateTest {
 
-    data class Reel(
-        val id: String,
-        val isLiked: Boolean,
-        val likes: Int,
-        val isSaved: Boolean = false,
-        val saves: Int = 0
+    companion object {
+        private const val INITIAL_LIKES = 5
+        private const val TOGGLED_LIKES = 6
+        private const val OTHER_REEL_LIKES = 10
+        private const val INITIAL_SAVES = 3
+        private const val OTHER_REEL_SAVES = 5
+    }
+
+    private fun testReel(
+        id: String,
+        isLiked: Boolean = false,
+        likes: Int = 0,
+        isSaved: Boolean = false,
+        saves: Int = 0
+    ) = ReelItem(
+        id = id,
+        avatarEmoji = "",
+        originalText = "",
+        translatedText = "",
+        clickableWord = "",
+        likes = likes,
+        saves = saves,
+        streakDays = 0,
+        language = "",
+        bgColors = emptyList(),
+        sceneEmoji = "",
+        isLiked = isLiked,
+        isSaved = isSaved
     )
 
-    data class LikeResponse(val liked: Boolean, val likesCount: Int)
-
-    private fun applyLikeSuccess(list: List<Reel>, id: String, response: LikeResponse) =
-        list.map {
-            if (it.id == id) it.copy(isLiked = response.liked, likes = response.likesCount) else it
-        }
-
-    private fun applyLikeFailure(list: List<Reel>) = list
-
-    private fun applySaveSuccess(list: List<Reel>, id: String, saved: Boolean) =
-        list.map { reel ->
-            if (reel.id == id) reel.copy(
-                isSaved = saved,
-                saves = if (saved) reel.saves + 1 else maxOf(0, reel.saves - 1)
-            ) else reel
-        }
-
-    private fun applySaveFailure(list: List<Reel>) = list
-
-    // Like - success
+   
 
     @Test
     fun `like success sets isLiked true and updates count from server`() {
-        val reels = listOf(Reel("1", isLiked = false, likes = 5))
-        val result = applyLikeSuccess(reels, "1", LikeResponse(liked = true, likesCount = 6))
+        val reels = listOf(testReel("1", isLiked = false, likes = INITIAL_LIKES))
+        val result = applyLikeSuccess(reels, "1", liked = true, likesCount = TOGGLED_LIKES)
         assertTrue(result[0].isLiked)
-        assertEquals(6, result[0].likes)
+        assertEquals(TOGGLED_LIKES, result[0].likes)
     }
 
     @Test
     fun `unlike success sets isLiked false and updates count from server`() {
-        val reels = listOf(Reel("1", isLiked = true, likes = 6))
-        val result = applyLikeSuccess(reels, "1", LikeResponse(liked = false, likesCount = 5))
+        val reels = listOf(testReel("1", isLiked = true, likes = TOGGLED_LIKES))
+        val result = applyLikeSuccess(reels, "1", liked = false, likesCount = INITIAL_LIKES)
         assertFalse(result[0].isLiked)
-        assertEquals(5, result[0].likes)
+        assertEquals(INITIAL_LIKES, result[0].likes)
     }
 
     @Test
     fun `like success does not modify other reels`() {
         val reels = listOf(
-            Reel("1", isLiked = false, likes = 5),
-            Reel("2", isLiked = true, likes = 10)
+            testReel("1", isLiked = false, likes = INITIAL_LIKES),
+            testReel("2", isLiked = true, likes = OTHER_REEL_LIKES)
         )
-        val result = applyLikeSuccess(reels, "1", LikeResponse(liked = true, likesCount = 6))
+        val result = applyLikeSuccess(reels, "1", liked = true, likesCount = TOGGLED_LIKES)
         assertTrue(result[1].isLiked)
-        assertEquals(10, result[1].likes)
+        assertEquals(OTHER_REEL_LIKES, result[1].likes)
     }
 
-    // Like - failure (rollback)
+    
 
     @Test
-    fun `like failure rolls back isLiked to original false`() {
-        val reels = listOf(Reel("1", isLiked = false, likes = 5))
-        val result = applyLikeFailure(reels)
+    fun `like failure restores original isLiked false`() {
+        val reels = listOf(testReel("1", isLiked = true, likes = TOGGLED_LIKES))
+        val result = applyLikeFailure(reels, "1", originalLiked = false, originalLikes = INITIAL_LIKES)
         assertFalse(result[0].isLiked)
-        assertEquals(5, result[0].likes)
+        assertEquals(INITIAL_LIKES, result[0].likes)
     }
 
     @Test
-    fun `like failure rolls back isLiked to original true`() {
-        val reels = listOf(Reel("1", isLiked = true, likes = 6))
-        val result = applyLikeFailure(reels)
+    fun `like failure restores original isLiked true`() {
+        val reels = listOf(testReel("1", isLiked = false, likes = INITIAL_LIKES))
+        val result = applyLikeFailure(reels, "1", originalLiked = true, originalLikes = TOGGLED_LIKES)
         assertTrue(result[0].isLiked)
-        assertEquals(6, result[0].likes)
+        assertEquals(TOGGLED_LIKES, result[0].likes)
     }
 
     @Test
-    fun `like failure leaves entire list unchanged`() {
+    fun `like failure does not modify other reels`() {
         val reels = listOf(
-            Reel("1", isLiked = false, likes = 5),
-            Reel("2", isLiked = true, likes = 10)
+            testReel("1", isLiked = true, likes = TOGGLED_LIKES),
+            testReel("2", isLiked = true, likes = OTHER_REEL_LIKES)
         )
-        val result = applyLikeFailure(reels)
-        assertEquals(reels, result)
+        val result = applyLikeFailure(reels, "1", originalLiked = false, originalLikes = INITIAL_LIKES)
+        assertTrue(result[1].isLiked)
+        assertEquals(OTHER_REEL_LIKES, result[1].likes)
     }
 
-    // Save - success
+  
 
     @Test
-    fun `save success marks reel as saved and increments saves`() {
-        val reels = listOf(Reel("1", isLiked = false, likes = 0, isSaved = false, saves = 3))
-        val result = applySaveSuccess(reels, "1", saved = true)
+    fun `save success marks reel as saved and updates count from server`() {
+        val reels = listOf(testReel("1", isSaved = false, saves = INITIAL_SAVES))
+        val result = applySaveSuccess(reels, "1", saved = true, savesCount = INITIAL_SAVES + 1)
         assertTrue(result[0].isSaved)
-        assertEquals(4, result[0].saves)
+        assertEquals(INITIAL_SAVES + 1, result[0].saves)
     }
 
     @Test
-    fun `unsave success clears isSaved and decrements saves`() {
-        val reels = listOf(Reel("1", isLiked = false, likes = 0, isSaved = true, saves = 3))
-        val result = applySaveSuccess(reels, "1", saved = false)
+    fun `unsave success clears isSaved and updates count from server`() {
+        val reels = listOf(testReel("1", isSaved = true, saves = INITIAL_SAVES))
+        val result = applySaveSuccess(reels, "1", saved = false, savesCount = INITIAL_SAVES - 1)
         assertFalse(result[0].isSaved)
-        assertEquals(2, result[0].saves)
+        assertEquals(INITIAL_SAVES - 1, result[0].saves)
     }
 
-    @Test
-    fun `unsave does not decrement saves below zero`() {
-        val reels = listOf(Reel("1", isLiked = false, likes = 0, isSaved = true, saves = 0))
-        val result = applySaveSuccess(reels, "1", saved = false)
-        assertEquals(0, result[0].saves)
-    }
 
-    // Save - failure (rollback)
+
 
     @Test
-    fun `save failure rolls back isSaved to original false`() {
-        val reels = listOf(Reel("1", isLiked = false, likes = 0, isSaved = false, saves = 3))
-        val result = applySaveFailure(reels)
+    fun `save failure restores original isSaved false`() {
+        val reels = listOf(testReel("1", isSaved = true, saves = INITIAL_SAVES + 1))
+        val result = applySaveFailure(reels, "1", originalSaved = false, originalSaves = INITIAL_SAVES)
         assertFalse(result[0].isSaved)
-        assertEquals(3, result[0].saves)
+        assertEquals(INITIAL_SAVES, result[0].saves)
     }
 
     @Test
-    fun `save failure leaves entire list unchanged`() {
+    fun `save failure restores original isSaved true`() {
+        val reels = listOf(testReel("1", isSaved = false, saves = INITIAL_SAVES - 1))
+        val result = applySaveFailure(reels, "1", originalSaved = true, originalSaves = INITIAL_SAVES)
+        assertTrue(result[0].isSaved)
+        assertEquals(INITIAL_SAVES, result[0].saves)
+    }
+
+    @Test
+    fun `save failure does not modify other reels`() {
         val reels = listOf(
-            Reel("1", isLiked = false, likes = 0, isSaved = false, saves = 0),
-            Reel("2", isLiked = false, likes = 0, isSaved = true, saves = 5)
+            testReel("1", isSaved = true, saves = INITIAL_SAVES + 1),
+            testReel("2", isSaved = true, saves = OTHER_REEL_SAVES)
         )
-        val result = applySaveFailure(reels)
-        assertEquals(reels, result)
+        val result = applySaveFailure(reels, "1", originalSaved = false, originalSaves = INITIAL_SAVES)
+        assertTrue(result[1].isSaved)
+        assertEquals(OTHER_REEL_SAVES, result[1].saves)
     }
 }

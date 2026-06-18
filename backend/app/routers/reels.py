@@ -375,11 +375,13 @@ def toggle_save(
     if existing:
         db.delete(existing)
         db.commit()
-        return {"saved": False}
+        saves_count = db.query(SavedReel).filter(SavedReel.reel_id == reel_id).count()
+        return {"saved": False, "saves_count": saves_count}
 
     db.add(SavedReel(user_id=user_id, reel_id=reel_id, created_at=datetime.utcnow()))
     db.commit()
-    return {"saved": True}
+    saves_count = db.query(SavedReel).filter(SavedReel.reel_id == reel_id).count()
+    return {"saved": True, "saves_count": saves_count}
 
 
 # ── DELETE /reels/{reel_id} ───────────────────────────────────────────────────

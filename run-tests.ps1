@@ -1,17 +1,4 @@
-# Runs all test suites: unit tests first (android, backend, reelang_ai),
-# then integration tests in the same order.
-#
-# Integration tests for backend/reelang_ai require Postgres running with the
-# reelang_test database (see backend/docker-compose.yml -> `docker compose up -d postgres`).
-# Android integration tests require a connected device/emulator with USB debugging
-# authorized and the screen unlocked.
-#
-# NOTE: Android integration tests are run via `adb shell am instrument` directly,
-# bypassing Gradle's connectedAndroidTest/UTP task. This works around a known
-# UTP <-> adb gRPC communication issue ("Failed to receive the UTP test results",
-# 0 tests recorded) seen with AGP 8.5.2 on some devices. If AGP is upgraded and
-# UTP starts working again, this step can be switched back to
-# `.\gradlew.bat connectedAndroidTest`.
+
 
 $repoRoot = $PSScriptRoot
 $pythonExe = Join-Path $repoRoot "backend\.venv\Scripts\python.exe"
@@ -40,8 +27,7 @@ function Run-Step {
     $script:results += [PSCustomObject]@{ Name = $Name; ExitCode = $exitCode }
 }
 
-# Runs Android instrumented tests via `adb shell am instrument`, bypassing
-# Gradle's connectedAndroidTest/UTP task. Sets $script:results with the outcome.
+
 function Run-AndroidInstrumentedTests {
     param(
         [string]$Name,

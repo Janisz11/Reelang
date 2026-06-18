@@ -68,8 +68,3 @@ def client(db):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
-
-
-@pytest.fixture(autouse=True)
-def mock_fetch_definition(monkeypatch):
-    monkeypatch.setattr("app.routers.words.fetch_definition", lambda term, lang: None)

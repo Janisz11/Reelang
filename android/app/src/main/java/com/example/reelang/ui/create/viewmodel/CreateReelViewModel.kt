@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.reelang.auth.model.UserSession
 import com.example.reelang.network.ApiClient
 import com.example.reelang.ui.create.model.UploadState
+import com.example.reelang.util.FileValidator
 import id.zelory.compressor.Compressor
 import id.zelory.compressor.constraint.quality
 import id.zelory.compressor.constraint.resolution
@@ -23,8 +24,6 @@ import java.io.File
 class CreateReelViewModel : ViewModel() {
 
     companion object {
-        private const val MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024L
-        private const val MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024L
         private const val IMAGE_MAX_WIDTH = 1920
         private const val IMAGE_MAX_HEIGHT = 1080
         private const val IMAGE_QUALITY = 80
@@ -44,24 +43,17 @@ class CreateReelViewModel : ViewModel() {
         viewModelScope.launch {
             _uploadState.value = UploadState.Loading
             try {
-                val fileToUpload = if (mimeType.startsWith("image/")) {
-                    if (file.length() > MAX_IMAGE_SIZE_BYTES) {
-                        Compressor.compress(context, file) {
-                            resolution(IMAGE_MAX_WIDTH, IMAGE_MAX_HEIGHT)
-                            quality(IMAGE_QUALITY)
-                            size(MAX_IMAGE_SIZE_BYTES)
-                        }
-                    } else {
-                        file
-                    }
-                } else {
-                    if (file.length() > MAX_VIDEO_SIZE_BYTES) {
-                        _uploadState.value = UploadState.Error(
-                            "Video is too large (max 100MB). Please choose a shorter clip."
-                        )
+                val fileToUpload: File = when (val result = FileValidator.validate(mimeType, file.length())) {
+                    is FileValidator.ValidationResult.Error -> {
+                        _uploadState.value = UploadState.Error(result.message)
                         return@launch
                     }
-                    file
+                    FileValidator.ValidationResult.NeedsCompression -> Compressor.compress(context, file) {
+                        resolution(IMAGE_MAX_WIDTH, IMAGE_MAX_HEIGHT)
+                        quality(IMAGE_QUALITY)
+                        size(FileValidator.MAX_IMAGE_BYTES)
+                    }
+                    FileValidator.ValidationResult.Ok -> file
                 }
                 val mediaPart = MultipartBody.Part.createFormData(
                     "file",
