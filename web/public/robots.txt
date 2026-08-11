@@ -1,0 +1,17 @@
+User-agent: *
+
+# Everything below the sign-in wall renders the same shell and redirects to
+# /auth for anonymous visitors, so there is nothing there for a crawler.
+Disallow: /onboarding
+Disallow: /feed
+Disallow: /search
+Disallow: /words
+Disallow: /practice
+Disallow: /profile
+Disallow: /stats
+Disallow: /settings
+Disallow: /create
+Disallow: /reel
+Disallow: /user-reels
+
+Sitemap: https://reelangweb.vercel.app/sitemap.xml
