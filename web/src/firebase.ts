@@ -10,7 +10,8 @@ const config = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-export const firebaseConfigured = Boolean(config.apiKey && config.appId);
+/** Auth only needs apiKey + authDomain; appId matters for Analytics, which this app does not use. */
+export const firebaseConfigured = Boolean(config.apiKey && config.authDomain);
 
 export const app = initializeApp(config);
 export const auth = getAuth(app);
