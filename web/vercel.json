@@ -7,5 +7,19 @@
     { "source": "/about", "destination": "/about.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
-  "redirects": [{ "source": "/about.html", "destination": "/about", "permanent": true }]
+  "redirects": [{ "source": "/about.html", "destination": "/about", "permanent": true }],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' https://www.googletagmanager.com https://www.youtube.com https://s.ytimg.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; font-src 'self' data:; connect-src 'self' https://reelang-production.up.railway.app https://*.googleapis.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://stats.g.doubleclick.net; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://reelang-afcb4.firebaseapp.com https://apis.google.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+        }
+      ]
+    }
+  ]
 }
