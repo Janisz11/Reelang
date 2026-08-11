@@ -1,4 +1,5 @@
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { usePageViews } from "./lib/analytics";
 import { useSession } from "./lib/session";
 import { WordsBadgeProvider } from "./lib/wordsBadge";
 import { BottomNav } from "./components/BottomNav";
@@ -75,6 +76,8 @@ function PublicOnly() {
 }
 
 export function App() {
+  usePageViews();
+
   return (
     <Routes>
       <Route element={<PublicOnly />}>

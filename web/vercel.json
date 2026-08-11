@@ -3,5 +3,9 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/about", "destination": "/about.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "redirects": [{ "source": "/about.html", "destination": "/about", "permanent": true }]
 }

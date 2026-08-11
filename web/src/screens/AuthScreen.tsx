@@ -190,6 +190,12 @@ export function AuthScreen() {
         >
           {tab === 0 ? "Don't have an account?  Register" : "Already have an account?  Sign In"}
         </button>
+        <div style={{ marginTop: 12 }}>
+          {/* Plain anchor: /about is a static page served outside the SPA. */}
+          <a href="/about" style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
+            What is ReeLang?
+          </a>
+        </div>
       </div>
     </div>
   );
