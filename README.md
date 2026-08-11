@@ -1,8 +1,14 @@
 # ReeLang - Language Learning Through Short Videos
 
+**Live demo → [reelangweb.vercel.app](https://reelangweb.vercel.app)** · [What the project is](https://reelangweb.vercel.app/about)
+
+A browser client with full screen parity with the Android app — the same vertical feed, tap-to-save subtitles, SM-2 flashcards, profiles and stats, talking to the same FastAPI backend and Firebase Auth. Built with React 18, TypeScript and Vite; source in [`web/`](web). Sign in with Google or an email account to try it.
+
+---
+
 ## Overview
 
-ReeLang is a mobile application that teaches foreign languages through short-form video content. Users scroll through a TikTok-style vertical feed of language-learning videos, tap unfamiliar words to save them, and then practice their vocabulary using a spaced-repetition flashcard system. An AI agent continuously curates personalized video feeds by discovering relevant YouTube Shorts for each user's target language and level.
+ReeLang teaches foreign languages through short-form video content, on Android and in the browser. Users scroll through a TikTok-style vertical feed of language-learning videos, tap unfamiliar words to save them, and then practice their vocabulary using a spaced-repetition flashcard system. An AI agent continuously curates personalized video feeds by discovering relevant YouTube Shorts for each user's target language and level.
 
 ---
 
@@ -37,6 +43,15 @@ ReeLang is a mobile application that teaches foreign languages through short-for
 - YouTube Android Player API (YouTube video playback)
 - Coil (image loading)
 - Navigation Compose
+
+### Web ([`web/`](web))
+- React 18 + TypeScript
+- Vite (build) — deployed on Vercel
+- React Router (routing + auth guards)
+- Firebase Web SDK (same auth as Android)
+- YouTube IFrame API (YouTube playback), `<video>` for uploaded reels
+- Web Speech API (pronunciation)
+- Hand-written CSS mirroring the Compose palette — no UI framework
 
 ### Backend
 - FastAPI (Python 3.12)
