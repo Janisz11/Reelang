@@ -1,5 +1,9 @@
 User-agent: *
 
+# Public, server-served pages.
+Allow: /$
+Allow: /about
+
 # Everything below the sign-in wall renders the same shell and redirects to
 # /auth for anonymous visitors, so there is nothing there for a crawler.
 Disallow: /onboarding

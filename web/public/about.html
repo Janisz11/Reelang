@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#B22222" />
+
+    <title>About ReeLang — Learn Languages Through Short Videos</title>
+    <meta
+      name="description"
+      content="ReeLang teaches languages through short-form video. Tap any word in the subtitles to save it, then review your vocabulary with SM-2 spaced repetition. Android app, web client, FastAPI backend and an AI feed curator."
+    />
+    <link rel="canonical" href="https://reelangweb.vercel.app/about" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="About ReeLang — Learn Languages Through Short Videos" />
+    <meta
+      property="og:description"
+      content="Tap any word in a video's subtitles to save it, then review with SM-2 spaced repetition. Kotlin + Compose on Android, React on the web, FastAPI behind both."
+    />
+    <meta property="og:url" content="https://reelangweb.vercel.app/about" />
+    <meta name="twitter:card" content="summary" />
+
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌎</text></svg>"
+    />
+
+    <style>
+      :root {
+        --red: #b22222;
+        --red-tint: #fff0f0;
+        --cream: #fdf6f0;
+        --surface: #ffffff;
+        --border: #e8ddd5;
+        --text: #1a1a1a;
+        --muted: #6b6b6b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--cream);
+        color: var(--text);
+        font-family: "Segoe UI", Roboto, "Helvetica Neue", system-ui, -apple-system, sans-serif;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .wrap {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+
+      /* ── Hero ─────────────────────────────────────────────────────────── */
+
+      header {
+        background: linear-gradient(to bottom, #1a0a0a, #3d1515);
+        color: #fff;
+        padding: 72px 0 64px;
+        text-align: center;
+      }
+
+      .globe {
+        font-size: 56px;
+        line-height: 1;
+      }
+
+      h1 {
+        margin: 14px 0 8px;
+        font-size: 40px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+      }
+
+      .tagline {
+        margin: 0 auto;
+        max-width: 30rem;
+        font-size: 17px;
+        color: rgba(255, 255, 255, 0.72);
+      }
+
+      .cta {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-top: 28px;
+      }
+
+      .btn {
+        display: inline-block;
+        padding: 13px 22px;
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: transform 0.15s, filter 0.15s;
+      }
+
+      .btn:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.08);
+      }
+
+      .btn--primary {
+        background: var(--red);
+        color: #fff;
+      }
+
+      .btn--ghost {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+      }
+
+      /* ── Sections ─────────────────────────────────────────────────────── */
+
+      section {
+        padding: 56px 0;
+      }
+
+      section + section {
+        border-top: 1px solid var(--border);
+      }
+
+      h2 {
+        margin: 0 0 8px;
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: -0.3px;
+      }
+
+      .lede {
+        margin: 0 0 32px;
+        color: var(--muted);
+        font-size: 16px;
+      }
+
+      p {
+        margin: 0 0 16px;
+      }
+
+      /* ── Steps ────────────────────────────────────────────────────────── */
+
+      ol.steps {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 16px;
+      }
+
+      @media (min-width: 680px) {
+        ol.steps {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+
+      .step {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 24px;
+      }
+
+      .step__num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--red-tint);
+        color: var(--red);
+        font-weight: 800;
+        font-size: 14px;
+        margin-bottom: 12px;
+      }
+
+      .step h3 {
+        margin: 0 0 6px;
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      /* ── Stack ────────────────────────────────────────────────────────── */
+
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      @media (min-width: 680px) {
+        .stack {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 22px;
+      }
+
+      .card h3 {
+        margin: 0 0 12px;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        color: var(--red);
+      }
+
+      .card ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .card li {
+        margin-bottom: 4px;
+      }
+
+      /* ── Footer ───────────────────────────────────────────────────────── */
+
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 32px 0 48px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      footer a {
+        color: var(--red);
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      footer a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <div class="wrap">
+        <div class="globe">🌎</div>
+        <h1>ReeLang</h1>
+        <p class="tagline">
+          Learn a language the way you already scroll — one short video at a time.
+        </p>
+        <div class="cta">
+          <a class="btn btn--primary" href="/">Open the app</a>
+          <a class="btn btn--ghost" href="https://github.com/Janisz11/ReeLang" rel="noopener">View on GitHub</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <div class="wrap">
+          <h2>What it is</h2>
+          <p class="lede">A language-learning app built around short-form video.</p>
+          <p>
+            ReeLang turns a vertical video feed into a vocabulary engine. Every clip carries
+            transcribed, translated subtitles, and every word in those subtitles is tappable — one tap
+            looks the word up and files it into your personal vocabulary list.
+          </p>
+          <p>
+            Saved words then come back to you on a schedule set by the <strong>SM-2 spaced-repetition
+            algorithm</strong>, the same method behind Anki. Words you find easy drift further apart;
+            words you keep missing return sooner. A background AI agent keeps the feed stocked,
+            searching YouTube for Shorts that match your target language and level.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <div class="wrap">
+          <h2>How it works</h2>
+          <p class="lede">Three steps, and the second one takes half a second.</p>
+          <ol class="steps">
+            <li class="step">
+              <span class="step__num">1</span>
+              <h3>Watch</h3>
+              <p>
+                Scroll a vertical feed of short clips in your target language, each one subtitled in
+                the original language and translated underneath.
+              </p>
+            </li>
+            <li class="step">
+              <span class="step__num">2</span>
+              <h3>Tap</h3>
+              <p>
+                Hit any word you don't recognise. ReeLang looks up its definition and translation
+                without pausing what you're watching.
+              </p>
+            </li>
+            <li class="step">
+              <span class="step__num">3</span>
+              <h3>Save</h3>
+              <p>
+                The word lands in your vocabulary list and enters the SM-2 review queue, resurfacing
+                as flashcards exactly when you're about to forget it.
+              </p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section>
+        <div class="wrap">
+          <h2>Tech stack</h2>
+          <p class="lede">Two clients, one API, and an agent that feeds them.</p>
+          <div class="stack">
+            <div class="card">
+              <h3>Android</h3>
+              <ul>
+                <li>Kotlin + Jetpack Compose</li>
+                <li>MVVM with ViewModel and StateFlow</li>
+                <li>Room for offline caching</li>
+                <li>Retrofit2 + OkHttp</li>
+                <li>ExoPlayer and the YouTube Player API</li>
+                <li>Firebase Authentication</li>
+              </ul>
+            </div>
+
+            <div class="card">
+              <h3>Web</h3>
+              <ul>
+                <li>React 18 + TypeScript</li>
+                <li>Vite</li>
+                <li>React Router</li>
+                <li>Firebase Web SDK</li>
+                <li>YouTube IFrame API</li>
+                <li>Deployed on Vercel</li>
+              </ul>
+            </div>
+
+            <div class="card">
+              <h3>Backend</h3>
+              <ul>
+                <li>FastAPI on Python 3.12</li>
+                <li>PostgreSQL 16</li>
+                <li>SQLAlchemy 2.0 + Alembic</li>
+                <li>Groq Whisper for transcription</li>
+                <li>yt-dlp and deep-translator</li>
+                <li>Cloudflare R2 via boto3</li>
+                <li>Deployed on Railway</li>
+              </ul>
+            </div>
+
+            <div class="card">
+              <h3>AI feed agent</h3>
+              <ul>
+                <li>Standalone FastAPI microservice</li>
+                <li>APScheduler on a 30-minute cycle</li>
+                <li>YouTube Data API v3</li>
+                <li>Builds a language and level profile per user</li>
+                <li>Fills a per-user feed queue in Postgres</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <p>
+          Built by <a href="https://github.com/Janisz11" rel="noopener">Janisz11</a> ·
+          <a href="https://github.com/Janisz11/ReeLang" rel="noopener">Source on GitHub</a> ·
+          <a href="/">Open the app</a>
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>
