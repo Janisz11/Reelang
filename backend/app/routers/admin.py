@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from sqlalchemy.orm import Session
 
+from ..database import get_db
 from ..dependencies import verify_admin_token
 from ..rate_limit import limiter
+from ..schemas import SchemaResponse
+from ..services.schema_introspection import get_schema_snapshot
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -22,3 +26,11 @@ async def upload_cookies(
     with open(_COOKIES_PATH, "wb") as f:
         f.write(contents)
     return {"status": "ok"}
+
+
+@router.get("/schema", response_model=SchemaResponse)
+def get_database_schema(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_token),
+):
+    return get_schema_snapshot(db.get_bind())

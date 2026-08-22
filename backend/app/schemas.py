@@ -148,3 +148,26 @@ class EventBatch(BaseModel):
 
 class EventBatchResponse(BaseModel):
     accepted: int
+
+
+class SchemaColumnResponse(BaseModel):
+    name: str
+    type: str
+    nullable: bool
+    primary_key: bool
+
+
+class SchemaForeignKeyResponse(BaseModel):
+    column: str
+    references_table: str
+    references_column: str
+
+
+class SchemaTableResponse(BaseModel):
+    name: str
+    columns: List[SchemaColumnResponse]
+    foreign_keys: List[SchemaForeignKeyResponse]
+
+
+class SchemaResponse(BaseModel):
+    tables: List[SchemaTableResponse]

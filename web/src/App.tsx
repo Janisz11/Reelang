@@ -1,9 +1,10 @@
+import { Suspense, lazy } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { usePageViews } from "./lib/analytics";
 import { useSession } from "./lib/session";
 import { WordsBadgeProvider } from "./lib/wordsBadge";
 import { BottomNav } from "./components/BottomNav";
-import { Spinner } from "./components/common";
+import { LoadingBox, Spinner } from "./components/common";
 import { AuthScreen } from "./screens/AuthScreen";
 import { OnboardingScreen } from "./screens/OnboardingScreen";
 import { FeedRoute, SearchFeedRoute, SingleReelRoute, UserReelsRoute } from "./screens/ReelsScreen";
@@ -15,6 +16,10 @@ import { ProfileScreen } from "./screens/ProfileScreen";
 import { StatsScreen } from "./screens/StatsScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { CreateReelScreen } from "./screens/CreateReelScreen";
+
+const SchemaViewer = lazy(() =>
+  import("./screens/SchemaViewer").then((m) => ({ default: m.SchemaViewer })),
+);
 
 const navRoutes = ["/feed", "/search", "/words", "/profile"];
 
@@ -100,6 +105,17 @@ export function App() {
         <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/create" element={<CreateReelScreen />} />
       </Route>
+
+      <Route
+        path="/admin/schema"
+        element={
+          <div className="shell">
+            <Suspense fallback={<LoadingBox />}>
+              <SchemaViewer />
+            </Suspense>
+          </div>
+        }
+      />
 
       <Route path="*" element={<Navigate to="/feed" replace />} />
     </Routes>
