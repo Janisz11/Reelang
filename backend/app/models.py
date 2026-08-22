@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, date
-from sqlalchemy import Column, String, Integer, BigInteger, DateTime, Date, ForeignKey, Text, Enum, Float
+from sqlalchemy import Column, String, Integer, BigInteger, DateTime, Date, ForeignKey, Text, Enum, Float, Boolean, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -118,3 +119,42 @@ class ActivityLog(Base):
     watch_time_ms = Column(BigInteger, default=0)
     reels_watched = Column(Integer, default=0)
     words_saved = Column(Integer, default=0)
+
+
+class ReelEvent(Base):
+    __tablename__ = "reel_events"
+
+    event_id = Column(UUID(as_uuid=True), primary_key=True)
+    event_type = Column(String(32), nullable=False)
+    user_id = Column(String, nullable=False)
+    reel_id = Column(String, ForeignKey("reels.id", ondelete="CASCADE"), nullable=False)
+    session_id = Column(UUID(as_uuid=True), nullable=False)
+    platform = Column(String(16), nullable=False)
+    client_timestamp = Column(DateTime(timezone=True), nullable=False)
+    server_timestamp = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    payload = Column(JSONB, nullable=True)
+
+
+class ReelStats(Base):
+    __tablename__ = "reel_stats"
+
+    reel_id = Column(String, ForeignKey("reels.id", ondelete="CASCADE"), primary_key=True)
+    impressions = Column(BigInteger, server_default="0", nullable=False)
+    completions = Column(BigInteger, server_default="0", nullable=False)
+    skips = Column(BigInteger, server_default="0", nullable=False)
+    likes = Column(BigInteger, server_default="0", nullable=False)
+    saves = Column(BigInteger, server_default="0", nullable=False)
+    avg_watch_percent = Column(Float, nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class UserReelStats(Base):
+    __tablename__ = "user_reel_stats"
+
+    user_id = Column(String, primary_key=True)
+    reel_id = Column(String, ForeignKey("reels.id", ondelete="CASCADE"), primary_key=True)
+    watch_count = Column(Integer, server_default="0", nullable=False)
+    max_watch_percent = Column(Float, server_default="0", nullable=False)
+    liked = Column(Boolean, server_default="false", nullable=False)
+    saved = Column(Boolean, server_default="false", nullable=False)
+    last_interaction = Column(DateTime(timezone=True), nullable=True)

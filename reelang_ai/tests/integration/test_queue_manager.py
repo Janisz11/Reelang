@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import pytest
 from sqlalchemy import text
 
-from reelang_ai.queue.queue_manager import (
+from reelang_ai.eventqueue.queue_manager import (
     enqueue_reel,
     get_r2_reels_for_user,
     get_seen_reel_ids,

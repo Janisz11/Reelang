@@ -1,7 +1,8 @@
 from __future__ import annotations
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from urllib.parse import urlparse
+from uuid import UUID
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}
@@ -110,3 +111,40 @@ class WordResponse(BaseModel):
 
 
 ReelDetailResponse.model_rebuild()
+
+
+EVENT_BATCH_MAX_SIZE = 50
+
+EventType = Literal[
+    "reel_impression",
+    "watch_progress",
+    "reel_completed",
+    "like",
+    "unlike",
+    "save",
+    "unsave",
+    "skip",
+    "replay",
+    "share",
+]
+
+Platform = Literal["android", "web"]
+
+
+class EventEnvelope(BaseModel):
+    event_id: UUID
+    event_type: EventType
+    user_id: str
+    reel_id: str
+    session_id: UUID
+    platform: Platform
+    client_timestamp: datetime
+    payload: Dict[str, Any] = Field(default_factory=dict)
+
+
+class EventBatch(BaseModel):
+    events: List[EventEnvelope] = Field(..., min_length=1, max_length=EVENT_BATCH_MAX_SIZE)
+
+
+class EventBatchResponse(BaseModel):
+    accepted: int

@@ -13,7 +13,7 @@ from ..recommenders.user_profiler import (
     get_users_needing_refill,
 )
 from ..recommenders.scorer import rank_candidates
-from ..queue.queue_manager import enqueue_reel, get_r2_reels_for_user, get_seen_reel_ids
+from ..eventqueue.queue_manager import enqueue_reel, get_r2_reels_for_user, get_seen_reel_ids
 from ..sources.youtube_source import search_youtube_shorts
 
 logger = logging.getLogger(__name__)

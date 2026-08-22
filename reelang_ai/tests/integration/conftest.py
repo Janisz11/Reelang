@@ -13,6 +13,23 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 
 @pytest.fixture
+def session_factory():
+    """Real committing sessions, for code that manages its own transactions."""
+    sessions = []
+
+    def factory():
+        session = TestingSessionLocal()
+        sessions.append(session)
+        return session
+
+    try:
+        yield factory
+    finally:
+        for session in sessions:
+            session.close()
+
+
+@pytest.fixture
 def db():
     connection = engine.connect()
     transaction = connection.begin()
