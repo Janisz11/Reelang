@@ -3,6 +3,7 @@ import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { usePageViews } from "./lib/analytics";
 import { useSession } from "./lib/session";
 import { WordsBadgeProvider } from "./lib/wordsBadge";
+import { AdminLayout } from "./components/AdminLayout";
 import { BottomNav } from "./components/BottomNav";
 import { LoadingBox, Spinner } from "./components/common";
 import { AuthScreen } from "./screens/AuthScreen";
@@ -106,16 +107,17 @@ export function App() {
         <Route path="/create" element={<CreateReelScreen />} />
       </Route>
 
-      <Route
-        path="/admin/schema"
-        element={
-          <div className="shell">
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<Navigate to="/admin/schema" replace />} />
+        <Route
+          path="schema"
+          element={
             <Suspense fallback={<LoadingBox />}>
               <SchemaViewer />
             </Suspense>
-          </div>
-        }
-      />
+          }
+        />
+      </Route>
 
       <Route path="*" element={<Navigate to="/feed" replace />} />
     </Routes>
