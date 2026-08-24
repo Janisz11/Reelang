@@ -1,5 +1,9 @@
+import os
+
 import httpx
 import pytest
+
+os.environ.setdefault("DATABASE_URL", "postgresql://unit-tests/unused")
 
 
 @pytest.fixture
