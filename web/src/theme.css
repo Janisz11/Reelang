@@ -194,6 +194,73 @@ a {
   font-weight: 700;
 }
 
+.admin__header-spacer {
+  flex: 1;
+}
+
+.deploy-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.deploy-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--cream);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.deploy-card__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-secondary);
+}
+
+.deploy-card__dot--success {
+  background: var(--green);
+}
+
+.deploy-card__dot--failed {
+  background: var(--red-light);
+}
+
+.deploy-card__dot--building {
+  background: var(--gold);
+}
+
+.deploy-card__dot--unknown {
+  background: var(--text-secondary);
+}
+
+.deploy-card__platform {
+  font-weight: 700;
+}
+
+.deploy-card__detail {
+  color: var(--text-secondary);
+}
+
+.deploy-card__commit {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+}
+
 .admin__content {
   flex: 1;
   min-height: 0;

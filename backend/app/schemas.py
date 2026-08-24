@@ -171,3 +171,21 @@ class SchemaTableResponse(BaseModel):
 
 class SchemaResponse(BaseModel):
     tables: List[SchemaTableResponse]
+
+
+DeploymentPlatform = Literal["railway", "vercel"]
+DeploymentState = Literal["success", "building", "failed", "unknown"]
+
+
+class DeploymentStatus(BaseModel):
+    platform: DeploymentPlatform
+    status: DeploymentState
+    raw_status: Optional[str] = None
+    deployed_at: Optional[datetime] = None
+    commit_sha: Optional[str] = None
+    url: Optional[str] = None
+    error: Optional[str] = None
+
+
+class DeploymentsResponse(BaseModel):
+    deployments: List[DeploymentStatus]

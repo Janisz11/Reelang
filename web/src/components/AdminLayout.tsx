@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { DeploymentStatusWidget } from "./DeploymentStatusWidget";
 import { DatabaseIcon } from "./Icons";
 
 interface IconProps {
@@ -58,6 +59,8 @@ export function AdminLayout() {
       <div className="admin__main">
         <header className="admin__header">
           <h1 className="admin__title">{sectionTitle(pathname)}</h1>
+          <span className="admin__header-spacer" />
+          <DeploymentStatusWidget />
         </header>
         <div className="admin__content">
           <Outlet />
