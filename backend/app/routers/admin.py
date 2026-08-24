@@ -1,15 +1,27 @@
 import asyncio
 import time
-from typing import Optional, Tuple
+from datetime import datetime
+from typing import List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..dependencies import verify_admin_token
+from ..models import AppLog
 from ..rate_limit import limiter
-from ..schemas import DeploymentsResponse, SchemaResponse
+from ..schemas import (
+    APP_LOGS_DEFAULT_LIMIT,
+    APP_LOGS_MAX_LIMIT,
+    AppLogEntry,
+    DeploymentsResponse,
+    EventStatsResponse,
+    EventStatsWindow,
+    LogLevel,
+    SchemaResponse,
+)
 from ..services import railway_client, vercel_client
+from ..services.event_stats import get_event_stats
 from ..services.schema_introspection import get_schema_snapshot
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -68,3 +80,32 @@ async def get_deployment_status(
     snapshot = DeploymentsResponse(deployments=[railway, vercel])
     _deployments_cache = (now, snapshot)
     return snapshot
+
+
+@router.get("/logs", response_model=List[AppLogEntry])
+def get_app_logs(
+    level: Optional[LogLevel] = None,
+    limit: int = Query(APP_LOGS_DEFAULT_LIMIT, ge=1, le=APP_LOGS_MAX_LIMIT),
+    before: Optional[datetime] = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_token),
+):
+    query = db.query(AppLog)
+
+    if level is not None:
+        query = query.filter(AppLog.level == level)
+    if before is not None:
+        query = query.filter(AppLog.created_at < before)
+
+    return (
+        query.order_by(AppLog.created_at.desc(), AppLog.id.desc()).limit(limit).all()
+    )
+
+
+@router.get("/event-stats", response_model=EventStatsResponse)
+def get_admin_event_stats(
+    window: EventStatsWindow = "24h",
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_token),
+):
+    return get_event_stats(db, window)

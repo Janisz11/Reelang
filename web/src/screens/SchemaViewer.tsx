@@ -13,13 +13,9 @@ import {
   type Edge,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ApiError } from "../api/client";
-import {
-  fetchSchema,
-  readStoredAdminToken,
-  storeAdminToken,
-  type SchemaResponse,
-} from "../api/admin";
+import { fetchSchema, type SchemaResponse } from "../api/admin";
+import { describeAdminError, useAdminToken } from "../lib/useAdminToken";
+import { AdminTokenGate } from "../components/AdminTokenGate";
 import {
   buildSchemaGraph,
   layoutGraph,
@@ -32,38 +28,6 @@ import { ErrorBox, LoadingBox } from "../components/common";
 const DIRECTION: LayoutDirection = "LR";
 
 const nodeTypes = { table: TableNode };
-
-function TokenGate({ onSubmit }: { onSubmit: (token: string) => void }) {
-  const [value, setValue] = useState("");
-
-  return (
-    <form
-      className="center-box"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const trimmed = value.trim();
-        if (trimmed) onSubmit(trimmed);
-      }}
-    >
-      <p style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Admin token</p>
-      <p className="muted" style={{ margin: 0, maxWidth: 420, textAlign: "center" }}>
-        Token jest trzymany wyłącznie w sessionStorage tej karty i nigdy nie trafia do
-        bundla aplikacji.
-      </p>
-      <input
-        type="password"
-        value={value}
-        autoComplete="off"
-        placeholder="X-Admin-Token"
-        onChange={(event) => setValue(event.target.value)}
-        style={{ padding: "10px 12px", borderRadius: 8, minWidth: 280 }}
-      />
-      <button className="btn btn--primary" type="submit" disabled={!value.trim()}>
-        Pokaż schemat
-      </button>
-    </form>
-  );
-}
 
 function SchemaFlow({
   schema,
@@ -143,7 +107,7 @@ function SchemaFlow({
 }
 
 export function SchemaViewer() {
-  const [token, setToken] = useState(readStoredAdminToken);
+  const { token, submitToken, clearToken } = useAdminToken();
   const [schema, setSchema] = useState<SchemaResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,13 +119,7 @@ export function SchemaViewer() {
       setSchema(await fetchSchema(activeToken));
     } catch (err) {
       setSchema(null);
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-        setError("Token odrzucony przez serwer (401/403). Sprawdź ADMIN_TOKEN.");
-      } else if (err instanceof ApiError) {
-        setError(`Błąd serwera (${err.status}): ${err.message}`);
-      } else {
-        setError("Nie udało się połączyć z API.");
-      }
+      setError(describeAdminError(err));
     } finally {
       setLoading(false);
     }
@@ -172,18 +130,12 @@ export function SchemaViewer() {
   }, [token, load]);
 
   const changeToken = () => {
-    storeAdminToken("");
-    setToken("");
+    clearToken();
     setSchema(null);
     setError(null);
   };
 
-  const submitToken = (next: string) => {
-    storeAdminToken(next);
-    setToken(next);
-  };
-
-  if (!token) return <TokenGate onSubmit={submitToken} />;
+  if (!token) return <AdminTokenGate submitLabel="Pokaż schemat" onSubmit={submitToken} />;
 
   if (loading && !schema) return <LoadingBox />;
 

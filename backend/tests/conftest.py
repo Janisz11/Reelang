@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Optional
 
@@ -9,8 +10,19 @@ from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.database import get_db
 from app.dependencies import get_current_user_id, get_optional_user_id
+from app.services.db_log_handler import DatabaseLogHandler
 
 TEST_USER_ID = "test-user"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def detach_database_log_handler():
+    """main.py installs it on import; during tests it would write to the dev database."""
+    root = logging.getLogger()
+    original = list(root.handlers)
+    root.handlers = [h for h in original if not isinstance(h, DatabaseLogHandler)]
+    yield
+    root.handlers = original
 
 
 def override_get_current_user_id(authorization: Optional[str] = Header(None)) -> str:

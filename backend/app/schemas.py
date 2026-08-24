@@ -189,3 +189,57 @@ class DeploymentStatus(BaseModel):
 
 class DeploymentsResponse(BaseModel):
     deployments: List[DeploymentStatus]
+
+
+LogLevel = Literal["WARNING", "ERROR", "CRITICAL"]
+
+APP_LOGS_DEFAULT_LIMIT = 50
+APP_LOGS_MAX_LIMIT = 200
+
+
+class AppLogEntry(BaseModel):
+    id: int
+    level: str
+    logger_name: str
+    message: str
+    context: Optional[Dict[str, Any]] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+EventStatsWindow = Literal["24h", "14d"]
+
+EVENT_STATS_TOP_LIMIT = 10
+EVENT_STATS_RECENT_LIMIT = 20
+
+
+class EventTimeBucket(BaseModel):
+    bucket: datetime
+    event_type: str
+    count: int
+
+
+class ReelRateEntry(BaseModel):
+    reel_id: str
+    title: Optional[str] = None
+    impressions: int
+    count: int
+    rate: float
+
+
+class RecentEvent(BaseModel):
+    event_id: UUID
+    event_type: str
+    reel_id: str
+    platform: str
+    server_timestamp: datetime
+
+
+class EventStatsResponse(BaseModel):
+    window: EventStatsWindow
+    time_series: List[EventTimeBucket]
+    top_completion: List[ReelRateEntry]
+    top_skip: List[ReelRateEntry]
+    recent_events: List[RecentEvent]

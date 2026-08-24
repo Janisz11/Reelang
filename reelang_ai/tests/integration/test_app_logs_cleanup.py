@@ -11,9 +11,10 @@ CREATE_APP_LOGS = text(
     """
     CREATE TABLE app_logs (
         id bigserial PRIMARY KEY,
-        level varchar(20) NOT NULL,
-        logger varchar(255) NOT NULL,
+        level varchar(16) NOT NULL,
+        logger_name varchar(128) NOT NULL,
         message text NOT NULL,
+        context jsonb,
         created_at timestamptz NOT NULL DEFAULT now()
     )
     """
@@ -21,8 +22,8 @@ CREATE_APP_LOGS = text(
 
 INSERT_APP_LOG = text(
     """
-    INSERT INTO app_logs (level, logger, message, created_at)
-    VALUES (:level, :logger, :message, :created_at)
+    INSERT INTO app_logs (level, logger_name, message, created_at)
+    VALUES (:level, :logger_name, :message, :created_at)
     """
 )
 
@@ -55,7 +56,7 @@ def insert_log(session, days_ago: float, message: str) -> None:
         INSERT_APP_LOG,
         {
             "level": "WARNING",
-            "logger": "reelang_ai.test",
+            "logger_name": "reelang_ai.test",
             "message": message,
             "created_at": datetime.now(timezone.utc) - timedelta(days=days_ago),
         },

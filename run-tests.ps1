@@ -5,16 +5,31 @@ $pythonExe = Join-Path $repoRoot "backend\.venv\Scripts\python.exe"
 $adbExe = Join-Path $env:LOCALAPPDATA "Android\Sdk\platform-tools\adb.exe"
 $results = @()
 
+if ($env:TEST_DATABASE_URL) {
+    $testDatabaseUrl = $env:TEST_DATABASE_URL
+} else {
+    $testDatabaseUrl = "postgresql://reelang:reelang@localhost:5432/reelang_test"
+}
+
 function Run-Step {
     param(
         [string]$Name,
         [string]$WorkingDir,
         [string]$Command,
-        [string[]]$Arguments
+        [string[]]$Arguments,
+        [hashtable]$EnvVars
     )
 
     Write-Host ""
     Write-Host "==== $Name ====" -ForegroundColor Cyan
+
+    $savedEnv = @{}
+    if ($EnvVars) {
+        foreach ($key in $EnvVars.Keys) {
+            $savedEnv[$key] = [Environment]::GetEnvironmentVariable($key)
+            [Environment]::SetEnvironmentVariable($key, $EnvVars[$key])
+        }
+    }
 
     Push-Location $WorkingDir
     try {
@@ -22,6 +37,9 @@ function Run-Step {
         $exitCode = $LASTEXITCODE
     } finally {
         Pop-Location
+        foreach ($key in $savedEnv.Keys) {
+            [Environment]::SetEnvironmentVariable($key, $savedEnv[$key])
+        }
     }
 
     $script:results += [PSCustomObject]@{ Name = $Name; ExitCode = $exitCode }
@@ -121,7 +139,8 @@ Run-Step -Name "Backend integration tests" `
 
 Run-Step -Name "ReeLang AI integration tests" `
     -WorkingDir (Join-Path $repoRoot "reelang_ai") `
-    -Command $pythonExe -Arguments @("-m", "pytest", "tests/integration", "-v")
+    -Command $pythonExe -Arguments @("-m", "pytest", "tests/integration", "-v") `
+    -EnvVars @{ DATABASE_URL = $testDatabaseUrl }
 
 # ============================ SUMMARY ============================
 Write-Host "`n########## SUMMARY ##########" -ForegroundColor Magenta

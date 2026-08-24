@@ -22,6 +22,14 @@ const SchemaViewer = lazy(() =>
   import("./screens/SchemaViewer").then((m) => ({ default: m.SchemaViewer })),
 );
 
+const EventStatsView = lazy(() =>
+  import("./screens/EventStatsView").then((m) => ({ default: m.EventStatsView })),
+);
+
+const LogsView = lazy(() =>
+  import("./screens/LogsView").then((m) => ({ default: m.LogsView })),
+);
+
 const navRoutes = ["/feed", "/search", "/words", "/profile"];
 
 function Shell({ dark = false }: { dark?: boolean }) {
@@ -114,6 +122,22 @@ export function App() {
           element={
             <Suspense fallback={<LoadingBox />}>
               <SchemaViewer />
+            </Suspense>
+          }
+        />
+        <Route
+          path="events"
+          element={
+            <Suspense fallback={<LoadingBox />}>
+              <EventStatsView />
+            </Suspense>
+          }
+        />
+        <Route
+          path="logs"
+          element={
+            <Suspense fallback={<LoadingBox />}>
+              <LogsView />
             </Suspense>
           }
         />

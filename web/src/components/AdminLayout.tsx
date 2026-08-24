@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { DeploymentStatusWidget } from "./DeploymentStatusWidget";
-import { DatabaseIcon } from "./Icons";
+import { ChartIcon, DatabaseIcon, ListIcon } from "./Icons";
 
 interface IconProps {
   size?: number;
@@ -17,6 +17,8 @@ interface AdminNavItem {
 
 export const ADMIN_NAV: AdminNavItem[] = [
   { label: "Schemat bazy", path: "/admin/schema", icon: DatabaseIcon },
+  { label: "Statystyki eventów", path: "/admin/events", icon: ChartIcon },
+  { label: "Logi", path: "/admin/logs", icon: ListIcon },
 ];
 
 function sectionTitle(pathname: string): string {

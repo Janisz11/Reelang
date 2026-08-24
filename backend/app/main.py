@@ -13,9 +13,12 @@ from slowapi.errors import RateLimitExceeded
 from .database import Base
 from .rate_limit import limiter
 from .routers import admin, reels, words, search, profiles, activity, feed, events
+from .services.db_log_handler import install_database_log_handler
 from .services.event_publisher import get_publisher, shutdown_publisher
 
 logger = logging.getLogger(__name__)
+
+install_database_log_handler()
 
 
 @asynccontextmanager

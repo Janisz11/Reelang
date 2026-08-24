@@ -148,6 +148,17 @@ class ReelStats(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class AppLog(Base):
+    __tablename__ = "app_logs"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    level = Column(String(16), nullable=False)
+    logger_name = Column(String(128), nullable=False)
+    message = Column(Text, nullable=False)
+    context = Column(JSONB, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class UserReelStats(Base):
     __tablename__ = "user_reel_stats"
 

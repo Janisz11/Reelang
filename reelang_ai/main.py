@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from .config import SCHEDULER_INTERVAL_MINUTES
 from .database import SessionLocal
+from .db_log_handler import install_database_log_handler
 from .scheduler.jobs import create_scheduler, run_curation_job
 
 logging.basicConfig(
@@ -13,6 +14,8 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+install_database_log_handler()
 
 api = FastAPI()
 
