@@ -22,6 +22,9 @@ WATCH_PERCENT_EVENTS = ("watch_progress", "reel_completed")
 
 VIEW_START_EVENTS = ("reel_impression", "replay")
 
+RAW_ONLY_EVENTS = ("reel_load_timing",)
+"""Performance telemetry: kept in the raw log, never folded into interaction counters."""
+
 LIKE_STATE = {"like": True, "unlike": False}
 SAVE_STATE = {"save": True, "unsave": False}
 
@@ -185,6 +188,10 @@ def persist_event(event: Dict, db: Session) -> bool:
             db.commit()
             logger.info(f"Skipping duplicate event {event['event_id']}")
             return False
+
+        if event_type in RAW_ONLY_EVENTS:
+            db.commit()
+            return True
 
         _apply_reel_stats(event_type, event["reel_id"], db)
 

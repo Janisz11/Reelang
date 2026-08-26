@@ -126,6 +126,7 @@ EventType = Literal[
     "skip",
     "replay",
     "share",
+    "reel_load_timing",
 ]
 
 Platform = Literal["android", "web"]

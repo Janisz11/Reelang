@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.reelang.events.EventTracker
+import com.example.reelang.events.EventTypes
 import com.example.reelang.network.ApiClient
 import com.example.reelang.ui.common.LocalDbSource
 import com.example.reelang.ui.common.UiState
@@ -43,6 +45,8 @@ import com.example.reelang.ui.feed.view.ReelTopBar
 import com.example.reelang.ui.onboarding.ReelangRed
 import com.example.reelang.ui.reels.viewmodel.YouTubeView
 import com.example.reelang.ui.reels.viewmodel.ImageOrVideoPlayer
+
+private const val IMPRESSION_DWELL_MS = 500L
 
 @Composable
 fun ReelsScreen(
@@ -123,6 +127,13 @@ fun ReelsScreen(
                         if (prevReel != null) {
                             viewModel.markConsumed(prevReel.id)
                         }
+
+                        // A settled page already fills the viewport; the delay adds the dwell
+                        // threshold, and settling on another page cancels this effect first.
+                        if (currentReel != null) {
+                            delay(IMPRESSION_DWELL_MS)
+                            EventTracker.track(EventTypes.REEL_IMPRESSION, currentReel.id)
+                        }
                     }
 
                     LaunchedEffect(Unit) {
@@ -162,7 +173,7 @@ fun ReelsScreen(
                             isActive = pagerState.settledPage == page,
                             onLike = { viewModel.toggleLike(reel.id) },
                             onSave = { viewModel.toggleSave(reel.id) },
-                            onShare = {},
+                            onShare = { EventTracker.track(EventTypes.SHARE, reel.id) },
                             onWordClick = { word -> viewModel.saveWord(word, reel.language, reel.id) },
                             onChannelClick = onProfileClick
                         )
@@ -210,6 +221,7 @@ fun ReelCard(
                 isActive = isActive,
                 captions = captions,
                 onWordClick = onWordClick,
+                reelId = reel.id,
                 modifier = Modifier.fillMaxSize()
             )
         }

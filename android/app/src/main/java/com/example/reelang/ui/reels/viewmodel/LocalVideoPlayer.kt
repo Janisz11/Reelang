@@ -25,7 +25,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -34,6 +36,9 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.reelang.events.EventTracker
+import com.example.reelang.events.PROGRESS_INTERVAL_MS
+import com.example.reelang.events.ReelPlaybackTracker
 import com.example.reelang.network.models.CaptionSegment
 import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
@@ -45,6 +50,7 @@ fun LocalVideoPlayer(
     isActive: Boolean,
     captions: List<CaptionSegment> = emptyList(),
     onWordClick: (String) -> Unit = {},
+    reelId: String? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -74,11 +80,75 @@ fun LocalVideoPlayer(
     var isPaused by remember { mutableStateOf(false) }
     var showPauseIcon by remember { mutableStateOf(false) }
 
+    val playbackTracker = remember(reelId) {
+        reelId?.let {
+            ReelPlaybackTracker(
+                reelId = it,
+                wasPrefetched = false,
+                networkType = EventTracker::networkType,
+                emit = EventTracker::track
+            )
+        }
+    }
+
+    DisposableEffect(playbackTracker) {
+        val tracker = playbackTracker ?: return@DisposableEffect onDispose {}
+        val listener = object : AnalyticsListener {
+            override fun onRenderedFirstFrame(
+                eventTime: AnalyticsListener.EventTime,
+                output: Any,
+                renderTimeMs: Long
+            ) {
+                tracker.onFirstFrameRendered()
+            }
+
+            override fun onPlaybackStateChanged(
+                eventTime: AnalyticsListener.EventTime,
+                state: Int
+            ) {
+                when (state) {
+                    Player.STATE_BUFFERING -> tracker.onBufferingStarted()
+                    Player.STATE_ENDED -> {
+                        tracker.onBufferingEnded()
+                        tracker.onPlaybackEnded()
+                    }
+                    else -> tracker.onBufferingEnded()
+                }
+            }
+
+            override fun onPositionDiscontinuity(
+                eventTime: AnalyticsListener.EventTime,
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                tracker.onProgress(newPosition.positionMs, exoPlayer.duration.coerceAtLeast(0), force = true)
+            }
+        }
+        exoPlayer.addAnalyticsListener(listener)
+        onDispose {
+            exoPlayer.removeAnalyticsListener(listener)
+            tracker.onLeft()
+        }
+    }
+
     LaunchedEffect(isActive) {
         if (isActive && !isPaused) {
+            playbackTracker?.onActivated()
             exoPlayer.playWhenReady = true
         } else {
             exoPlayer.playWhenReady = false
+        }
+    }
+
+    LaunchedEffect(playbackTracker, isActive) {
+        val tracker = playbackTracker ?: return@LaunchedEffect
+        if (!isActive) return@LaunchedEffect
+        while (true) {
+            delay(PROGRESS_INTERVAL_MS)
+            if (exoPlayer.isPlaying) {
+                tracker.onProgress(exoPlayer.currentPosition, exoPlayer.duration.coerceAtLeast(0))
+            }
         }
     }
 
@@ -109,6 +179,11 @@ fun LocalVideoPlayer(
             isPaused = !isPaused
             exoPlayer.playWhenReady = !isPaused
             showPauseIcon = true
+            playbackTracker?.onProgress(
+                exoPlayer.currentPosition,
+                exoPlayer.duration.coerceAtLeast(0),
+                force = true
+            )
         }
     ) {
         AndroidView(
@@ -187,6 +262,7 @@ fun ImageOrVideoPlayer(
     isActive: Boolean,
     captions: List<CaptionSegment> = emptyList(),
     onWordClick: (String) -> Unit = {},
+    reelId: String? = null,
     modifier: Modifier = Modifier
 ) {
     var loadFailed by remember { mutableStateOf(false) }
@@ -213,6 +289,7 @@ fun ImageOrVideoPlayer(
                 isActive = isActive,
                 captions = captions,
                 onWordClick = onWordClick,
+                reelId = reelId,
                 modifier = Modifier.fillMaxSize()
             )
         }

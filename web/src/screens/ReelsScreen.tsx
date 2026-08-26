@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/reelang";
 import { streamUrl } from "../api/client";
 import type { CaptionSegment, ProfileResponse, ReelResponse } from "../api/types";
+import { enqueueEvent } from "../lib/eventTracking";
 import { bgGradientFor, formatCount, initialsFrom, levelColor, sceneEmojiFor } from "../lib/format";
 import { useSession } from "../lib/session";
 import { useToast } from "../lib/toast";
@@ -11,6 +12,8 @@ import { CaptionOverlay, activeCaptionAt } from "../components/CaptionOverlay";
 import { VideoReel, YouTubeReel } from "../components/ReelPlayer";
 import { BookmarkIcon, HeartIcon, ShareIcon } from "../components/Icons";
 import { EmptyBox, ErrorBox, LoadingBox } from "../components/common";
+
+const IMPRESSION_DWELL_MS = 500;
 
 type FeedMode =
   | { kind: "feed" }
@@ -191,7 +194,12 @@ function ReelCard({
       {reel.youtube_id ? (
         <YouTubeReel youtubeId={reel.youtube_id} isActive={isActive} onTimeUpdate={handleTime} />
       ) : (
-        <VideoReel streamUrl={streamUrl(reel.id)} isActive={isActive} onTimeUpdate={handleTime} />
+        <VideoReel
+          streamUrl={streamUrl(reel.id)}
+          isActive={isActive}
+          onTimeUpdate={handleTime}
+          reelId={reel.id}
+        />
       )}
 
       <ReelTopBar reel={reel} owner={owner} streakDays={streakDays} onChannelClick={onChannelClick} />
@@ -311,6 +319,18 @@ export function ReelsScreen({ mode }: { mode: FeedMode }) {
       .catch(() => undefined);
   }, []);
 
+  // An impression needs the card to hold the viewport for a beat, so a scroll-through
+  // that passes over a reel never counts.
+  useEffect(() => {
+    const reel = reels[activeIndex];
+    if (!reel) return;
+    const id = window.setTimeout(
+      () => enqueueEvent("reel_impression", reel.id),
+      IMPRESSION_DWELL_MS,
+    );
+    return () => window.clearTimeout(id);
+  }, [activeIndex, reels]);
+
   // Load captions for the visible reel and mark the previous one consumed.
   useEffect(() => {
     const reel = reels[activeIndex];
@@ -382,6 +402,7 @@ export function ReelsScreen({ mode }: { mode: FeedMode }) {
   const toggleLike = useCallback(async (reel: ReelResponse) => {
     try {
       const result = await api.toggleLike(reel.id);
+      enqueueEvent(result.liked ? "like" : "unlike", reel.id);
       setReels((prev) =>
         prev.map((item) =>
           item.id === reel.id ? { ...item, is_liked: result.liked, likes_count: result.likes_count } : item,
@@ -395,6 +416,7 @@ export function ReelsScreen({ mode }: { mode: FeedMode }) {
   const toggleSave = useCallback(async (reel: ReelResponse) => {
     try {
       const result = await api.toggleSave(reel.id);
+      enqueueEvent(result.saved ? "save" : "unsave", reel.id);
       setReels((prev) => prev.map((item) => (item.id === reel.id ? { ...item, is_saved: result.saved } : item)));
       toast(result.saved ? "Saved to your profile" : "Removed from saved");
     } catch {
@@ -418,6 +440,7 @@ export function ReelsScreen({ mode }: { mode: FeedMode }) {
   const share = useCallback(
     async (reel: ReelResponse) => {
       const url = `${window.location.origin}/reel/${reel.id}`;
+      enqueueEvent("share", reel.id);
       try {
         if (navigator.share) await navigator.share({ title: reel.title ?? "ReeLang", url });
         else {

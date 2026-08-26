@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPlaybackTracker, type PlaybackTracker } from "../lib/reelPlayback";
 import { loadYouTubeApi, type YTPlayer } from "../lib/youtube";
 import { PauseIcon, PlayIcon } from "./Icons";
 
@@ -36,6 +37,10 @@ function PlayPauseFlash({ paused, visible }: { paused: boolean; visible: boolean
       </div>
     </div>
   );
+}
+
+function durationMsOf(video: HTMLVideoElement): number {
+  return Number.isFinite(video.duration) ? Math.round(video.duration * 1000) : 0;
 }
 
 /** Browsers block audible autoplay, so reels start muted with a tap-to-unmute affordance. */
@@ -160,18 +165,39 @@ export function YouTubeReel({ youtubeId, isActive, onTimeUpdate }: PlayerProps &
   );
 }
 
-export function VideoReel({ streamUrl, isActive, onTimeUpdate }: PlayerProps & { streamUrl: string }) {
+export function VideoReel({
+  streamUrl,
+  isActive,
+  onTimeUpdate,
+  reelId,
+}: PlayerProps & { streamUrl: string; reelId?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [paused, setPaused] = useState(false);
   const [muted, setMuted] = useState(true);
   const [flash, setFlash] = useState(false);
   const [isImage, setIsImage] = useState(false);
 
+  // Held in a ref, not state: a fresh tracker per mount keeps StrictMode's double-invoke
+  // from retiring the tracker the remounted player still needs.
+  const trackerRef = useRef<PlaybackTracker | null>(null);
+
+  useEffect(() => {
+    if (!reelId) return;
+    trackerRef.current = createPlaybackTracker(reelId);
+    // A skip is only known once the card is gone, so the report happens on teardown.
+    return () => {
+      trackerRef.current?.onLeft();
+      trackerRef.current = null;
+    };
+  }, [reelId]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video || isImage) return;
-    if (isActive && !paused) void video.play().catch(() => undefined);
-    else video.pause();
+    if (isActive && !paused) {
+      trackerRef.current?.onActivated();
+      void video.play().catch(() => undefined);
+    } else video.pause();
   }, [isActive, paused, isImage]);
 
   useEffect(() => {
@@ -201,7 +227,35 @@ export function VideoReel({ streamUrl, isActive, onTimeUpdate }: PlayerProps & {
         playsInline
         preload="metadata"
         onError={() => setIsImage(true)}
-        onTimeUpdate={(event) => onTimeUpdate(Math.round(event.currentTarget.currentTime * 1000))}
+        onLoadStart={() => trackerRef.current?.onLoadStarted()}
+        onWaiting={() => trackerRef.current?.onBufferingStarted()}
+        onPlaying={() => {
+          trackerRef.current?.onBufferingEnded();
+          trackerRef.current?.onFirstFrameRendered();
+        }}
+        onLoadedData={() => trackerRef.current?.onFirstFrameRendered()}
+        onEnded={() => trackerRef.current?.onPlaybackEnded()}
+        onSeeked={(event) =>
+          trackerRef.current?.onProgress(
+            Math.round(event.currentTarget.currentTime * 1000),
+            durationMsOf(event.currentTarget),
+            true,
+          )
+        }
+        onPause={(event) =>
+          trackerRef.current?.onProgress(
+            Math.round(event.currentTarget.currentTime * 1000),
+            durationMsOf(event.currentTarget),
+            true,
+          )
+        }
+        onTimeUpdate={(event) => {
+          onTimeUpdate(Math.round(event.currentTarget.currentTime * 1000));
+          trackerRef.current?.onProgress(
+            Math.round(event.currentTarget.currentTime * 1000),
+            durationMsOf(event.currentTarget),
+          );
+        }}
         style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }}
       />
       {muted && (

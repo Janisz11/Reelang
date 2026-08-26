@@ -442,6 +442,55 @@ class TestUserReelStats:
         assert user_stats(session_factory, skipper, reel_id)[2] is False
 
 
+class TestRawOnlyEvents:
+    async def test_reel_load_timing_lands_in_reel_events(
+        self, handler, session_factory, user_id, reel_id
+    ):
+        payload = {
+            "time_to_first_frame_ms": 640,
+            "was_prefetched": False,
+            "buffering_ms": 180,
+            "network_type": "wifi",
+        }
+        event = make_event(user_id, reel_id, event_type="reel_load_timing", payload=payload)
+
+        message = message_for(event)
+        await handler(message)
+
+        assert message.acked is True
+        row = _read(
+            session_factory,
+            "SELECT event_type, payload FROM reel_events WHERE event_id = CAST(:eid AS uuid)",
+            {"eid": event["event_id"]},
+        )
+        assert row is not None
+        assert row[0] == "reel_load_timing"
+        assert row[1] == payload
+
+    async def test_reel_load_timing_leaves_reel_stats_untouched(
+        self, handler, session_factory, user_id, reel_id
+    ):
+        await handler(message_for(make_event(user_id, reel_id, event_type="reel_load_timing")))
+
+        assert reel_stats(session_factory, reel_id) is None
+
+    async def test_reel_load_timing_leaves_user_reel_stats_untouched(
+        self, handler, session_factory, user_id, reel_id
+    ):
+        await handler(message_for(make_event(user_id, reel_id, event_type="reel_load_timing")))
+
+        assert user_stats(session_factory, user_id, reel_id) is None
+
+    async def test_reel_load_timing_does_not_disturb_neighbouring_counters(
+        self, handler, session_factory, user_id, reel_id
+    ):
+        await handler(message_for(make_event(user_id, reel_id, event_type="reel_impression")))
+        await handler(message_for(make_event(user_id, reel_id, event_type="reel_load_timing")))
+
+        assert reel_stats(session_factory, reel_id)[0] == 1
+        assert raw_event_count(session_factory, reel_id) == 2
+
+
 class TestIdempotency:
     async def test_redelivered_event_is_stored_once(
         self, handler, session_factory, user_id, reel_id

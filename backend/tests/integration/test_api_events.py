@@ -181,6 +181,53 @@ class TestIngestEvents:
         assert response.status_code == 503
 
 
+class TestReelLoadTiming:
+    def test_timing_event_is_accepted_and_published(self, client, publisher):
+        user = new_user()
+        payload = {
+            "time_to_first_frame_ms": 640,
+            "was_prefetched": False,
+            "buffering_ms": 180,
+            "network_type": "wifi",
+        }
+
+        response = client.post(
+            "/api/v1/events",
+            headers=auth(user),
+            json={
+                "events": [
+                    make_event(user, event_type="reel_load_timing", payload=payload)
+                ]
+            },
+        )
+
+        assert response.status_code == 202
+        published = publisher.batches[0][0]
+        assert published.event_type == "reel_load_timing"
+        assert published.payload == payload
+
+    def test_web_platform_timing_event_is_accepted(self, client, publisher):
+        user = new_user()
+
+        response = client.post(
+            "/api/v1/events",
+            headers=auth(user),
+            json={
+                "events": [
+                    make_event(
+                        user,
+                        event_type="reel_load_timing",
+                        platform="web",
+                        payload={"network_type": "unknown"},
+                    )
+                ]
+            },
+        )
+
+        assert response.status_code == 202
+        assert publisher.batches[0][0].platform == "web"
+
+
 class TestRateLimiting:
     def test_blocks_user_after_configured_number_of_batches(self, client, publisher):
         user = new_user()
@@ -261,3 +308,54 @@ class TestPublishesToRealBroker:
         assert body["event_id"] == event["event_id"]
         assert body["user_id"] == user
         assert body["reel_id"] == event["reel_id"]
+
+    def test_timing_event_reaches_the_exchange_with_its_payload(self, client):
+        user = new_user()
+        queue_name = f"test.events.{uuid.uuid4().hex}"
+        payload = {
+            "time_to_first_frame_ms": 512,
+            "was_prefetched": False,
+            "buffering_ms": 96,
+            "network_type": "cellular",
+        }
+        event = make_event(user, event_type="reel_load_timing", payload=payload)
+
+        state = {}
+
+        async def declare():
+            connection = await aio_pika.connect_robust(RABBITMQ_URL)
+            channel = await connection.channel()
+            exchange = await channel.declare_exchange(
+                EVENTS_EXCHANGE, aio_pika.ExchangeType.TOPIC, durable=True
+            )
+            queue = await channel.declare_queue(queue_name, durable=False, auto_delete=True)
+            await queue.bind(exchange, routing_key="event.#")
+            state["connection"] = connection
+            state["queue"] = queue
+
+        async def drain():
+            for _ in range(20):
+                message = await state["queue"].get(fail=False, timeout=5)
+                if message is not None:
+                    async with message.process():
+                        return json.loads(message.body), message.routing_key
+                await asyncio.sleep(0.1)
+            return None, None
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(declare())
+
+            response = client.post(
+                "/api/v1/events", headers=auth(user), json={"events": [event]}
+            )
+            assert response.status_code == 202
+
+            body, routing_key = loop.run_until_complete(drain())
+        finally:
+            loop.run_until_complete(state["connection"].close())
+            loop.close()
+
+        assert body is not None, "timing event never arrived on the events exchange"
+        assert routing_key == "event.reel_load_timing"
+        assert body["payload"] == payload

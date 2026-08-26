@@ -3,6 +3,8 @@ package com.example.reelang.network
 import com.example.reelang.network.models.ActivityLogRequest
 import com.example.reelang.network.models.ActivityStatsResponse
 import com.example.reelang.network.models.CaptionSegment
+import com.example.reelang.network.models.EventBatchRequest
+import com.example.reelang.network.models.EventBatchResponse
 import com.example.reelang.network.models.FollowResponse
 import com.example.reelang.network.models.LikeResponse
 import com.example.reelang.network.models.ProfileResponse
@@ -161,6 +163,13 @@ interface ReelangApi {
         @Path("profileUserId") profileUserId: String,
         @Query("user_id") userId: String
     ): FollowResponse
+
+    // ── Events ───────────────────────────────────────────────
+
+    @POST("events")
+    suspend fun postEvents(
+        @Body body: EventBatchRequest
+    ): retrofit2.Response<EventBatchResponse>
 
     // ── Activity ──────────────────────────────────────────────────────────────
 

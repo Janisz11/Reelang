@@ -49,10 +49,23 @@ class TestEventEnvelope:
             "skip",
             "replay",
             "share",
+            "reel_load_timing",
         ],
     )
     def test_accepts_every_supported_event_type(self, event_type):
         assert EventEnvelope(**make_event(event_type=event_type)).event_type == event_type
+
+    def test_accepts_reel_load_timing_payload(self):
+        payload = {
+            "time_to_first_frame_ms": 480,
+            "was_prefetched": False,
+            "buffering_ms": 120,
+            "network_type": "wifi",
+        }
+        envelope = EventEnvelope(**make_event(event_type="reel_load_timing", payload=payload))
+
+        assert envelope.event_type == "reel_load_timing"
+        assert envelope.payload == payload
 
     def test_rejects_unknown_event_type(self):
         with pytest.raises(ValidationError):

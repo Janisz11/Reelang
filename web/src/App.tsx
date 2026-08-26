@@ -1,6 +1,7 @@
 import { Suspense, lazy } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { usePageViews } from "./lib/analytics";
+import { useEventTracking } from "./lib/useEventTracking";
 import { useSession } from "./lib/session";
 import { WordsBadgeProvider } from "./lib/wordsBadge";
 import { AdminLayout } from "./components/AdminLayout";
@@ -91,6 +92,7 @@ function PublicOnly() {
 
 export function App() {
   usePageViews();
+  useEventTracking();
 
   return (
     <Routes>

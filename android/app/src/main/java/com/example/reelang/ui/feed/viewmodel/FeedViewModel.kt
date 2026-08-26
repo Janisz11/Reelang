@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.reelang.auth.model.UserSession
 import com.example.reelang.data.local.LocalDataSource
 import com.example.reelang.data.local.entities.ReelEntity
+import com.example.reelang.events.EventTracker
+import com.example.reelang.events.EventTypes
 import com.example.reelang.network.ApiClient
 import com.example.reelang.network.models.ActivityLogRequest
 import com.example.reelang.network.models.CaptionSegment
@@ -181,6 +183,10 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
                 ApiClient.api.toggleLike(id, UserSession.userId)
             }.onSuccess { response ->
                 _uiState.value = UiState.Success(applyLikeSuccess(list, id, response.liked, response.likesCount))
+                EventTracker.track(
+                    if (response.liked) EventTypes.LIKE else EventTypes.UNLIKE,
+                    id
+                )
                 SharedState.triggerProfileRefresh()
             }.onFailure {
                 Log.e("FeedViewModel", "Failed to toggle like", it)
@@ -250,6 +256,10 @@ class FeedViewModel(private val autoLoad: Boolean = true) : ViewModel() {
                 ApiClient.api.toggleSave(id, UserSession.userId)
             }.onSuccess { response ->
                 _uiState.value = UiState.Success(applySaveSuccess(list, id, response.saved, response.savesCount))
+                EventTracker.track(
+                    if (response.saved) EventTypes.SAVE else EventTypes.UNSAVE,
+                    id
+                )
                 SharedState.triggerProfileRefresh()
             }.onFailure {
                 Log.e("FeedViewModel", "Failed to toggle save", it)
