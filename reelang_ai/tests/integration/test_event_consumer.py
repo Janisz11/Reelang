@@ -13,11 +13,11 @@ from reelang_ai.events.consumer import make_message_handler
 
 pytestmark = pytest.mark.db
 
-RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
+RABBITMQ_PRIVATE_URL = os.getenv("RABBITMQ_PRIVATE_URL", "amqp://guest:guest@localhost:5672/")
 
 
 def _broker_reachable() -> bool:
-    parsed = urlparse(RABBITMQ_URL)
+    parsed = urlparse(RABBITMQ_PRIVATE_URL)
     sock = socket.socket()
     sock.settimeout(1)
     try:
@@ -651,7 +651,7 @@ class TestBrokerRoundTrip:
 
         event = make_event(user_id, reel_id, event_type="reel_completed")
 
-        connection = await aio_pika.connect_robust(RABBITMQ_URL)
+        connection = await aio_pika.connect_robust(RABBITMQ_PRIVATE_URL)
         try:
             channel = await connection.channel()
             queue = await declare_topology(channel)

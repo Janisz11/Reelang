@@ -11,12 +11,12 @@ from aio_pika.pool import Pool
 logger = logging.getLogger(__name__)
 
 EVENTS_EXCHANGE = "reelang.events"
-DEFAULT_RABBITMQ_URL = "amqp://guest:guest@localhost:5672/"
+DEFAULT_RABBITMQ_PRIVATE_URL = "amqp://guest:guest@localhost:5672/"
 CHANNEL_POOL_SIZE = 4
 
 
 def _rabbitmq_url() -> str:
-    return os.getenv("RABBITMQ_URL", DEFAULT_RABBITMQ_URL)
+    return os.getenv("RABBITMQ_PRIVATE_URL", DEFAULT_RABBITMQ_PRIVATE_URL)
 
 
 class EventPublisher:

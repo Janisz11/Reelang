@@ -7,7 +7,7 @@ import uvicorn
 from fastapi import FastAPI
 from sqlalchemy import text
 
-from ..config import EVENTS_HEALTH_PORT, EVENTS_PREFETCH_COUNT, RABBITMQ_URL
+from ..config import EVENTS_HEALTH_PORT, EVENTS_PREFETCH_COUNT, RABBITMQ_PRIVATE_URL
 from ..database import SessionLocal
 from .aggregator import MalformedEvent, persist_event
 
@@ -130,7 +130,7 @@ async def health():
 
 
 async def run_consumer() -> None:
-    connection = await aio_pika.connect_robust(RABBITMQ_URL)
+    connection = await aio_pika.connect_robust(RABBITMQ_PRIVATE_URL)
     state.connection = connection
 
     channel = await connection.channel()

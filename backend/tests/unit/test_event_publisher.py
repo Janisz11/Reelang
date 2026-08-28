@@ -137,7 +137,7 @@ class TestConnect:
 
     @pytest.mark.asyncio
     async def test_reads_url_from_environment(self, broker, monkeypatch):
-        monkeypatch.setenv("RABBITMQ_URL", "amqp://from-env/")
+        monkeypatch.setenv("RABBITMQ_PRIVATE_URL", "amqp://from-env/")
 
         await EventPublisher().connect()
 

@@ -44,7 +44,7 @@ services:
       rabbitmq:
         condition: service_healthy
     environment:
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
+      RABBITMQ_PRIVATE_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
       DATABASE_URL: postgresql://${POSTGRES_USER:-reelang}:${POSTGRES_PASSWORD:-reelang}@postgres:5432/${POSTGRES_DB:-reelang}
       GROQ_API_KEY: ${GROQ_API_KEY}
       ADMIN_TOKEN: ${ADMIN_TOKEN}
@@ -95,7 +95,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-reelang}:${POSTGRES_PASSWORD:-reelang}@postgres:5432/${POSTGRES_DB:-reelang}
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
+      RABBITMQ_PRIVATE_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
       EVENTS_HEALTH_PORT: 8002
     ports:
       - "8002:8002"

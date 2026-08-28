@@ -14,11 +14,11 @@ from app.main import app
 from app.routers.events import EVENT_BATCH_RATE_LIMIT
 from app.services.event_publisher import EVENTS_EXCHANGE, get_publisher
 
-RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
+RABBITMQ_PRIVATE_URL = os.getenv("RABBITMQ_PRIVATE_URL", "amqp://guest:guest@localhost:5672/")
 
 
 def _broker_reachable() -> bool:
-    parsed = urlparse(RABBITMQ_URL)
+    parsed = urlparse(RABBITMQ_PRIVATE_URL)
     sock = socket.socket()
     sock.settimeout(1)
     try:
@@ -270,7 +270,7 @@ class TestPublishesToRealBroker:
         state = {}
 
         async def declare():
-            connection = await aio_pika.connect_robust(RABBITMQ_URL)
+            connection = await aio_pika.connect_robust(RABBITMQ_PRIVATE_URL)
             channel = await connection.channel()
             exchange = await channel.declare_exchange(
                 EVENTS_EXCHANGE, aio_pika.ExchangeType.TOPIC, durable=True
@@ -323,7 +323,7 @@ class TestPublishesToRealBroker:
         state = {}
 
         async def declare():
-            connection = await aio_pika.connect_robust(RABBITMQ_URL)
+            connection = await aio_pika.connect_robust(RABBITMQ_PRIVATE_URL)
             channel = await connection.channel()
             exchange = await channel.declare_exchange(
                 EVENTS_EXCHANGE, aio_pika.ExchangeType.TOPIC, durable=True
